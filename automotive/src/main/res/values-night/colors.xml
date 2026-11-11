@@ -1,0 +1,4 @@
+<resources>
+    <!-- 앱이 켜지는 짧은 순간의 창 배경 (야간) -->
+    <color name="window_background">#12151A</color>
+</resources>

@@ -1,6 +1,0 @@
-<resources>
-    <!-- 직접 만든 화면용 테마: 액션바 없음. 배경과 색은 코드(DriveMateUi)에서 주간/야간에 맞춰 칠한다 -->
-    <style name="Theme.DriveMate.Ui" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@android:color/black</item>
-    </style>
-</resources>

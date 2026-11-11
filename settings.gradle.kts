@@ -19,6 +19,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Pleos SDK(Vehicle, NaviHelper, TextToSpeech, SpeechToText)를 내려받는 저장소
         maven {
             url = uri("https://nexus-playground.pleos.ai/repository/maven-releases/")
         }
@@ -26,7 +27,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "DriveMate"
-include(":mobile")
+// 앱 코드는 automotive 모듈 하나에 모두 들어 있다 (예전 shared·mobile 모듈은 v2에서 없앰)
 include(":automotive")
-include(":shared")
- 

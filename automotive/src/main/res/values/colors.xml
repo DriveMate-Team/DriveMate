@@ -1,0 +1,4 @@
+<resources>
+    <!-- 앱이 켜지는 짧은 순간의 창 배경 (주간). 설계문서 3단계 "배경" 색과 같다 -->
+    <color name="window_background">#F5F6F8</color>
+</resources>

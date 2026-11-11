@@ -1,4 +1,6 @@
 <resources>
-
-    <style name="Theme.DriveMate" parent="android:Theme.Material.Light.DarkActionBar" />
+    <!-- 앱 창의 기본 테마: 액션바 없음. 실제 색은 Compose 테마(ui/theme)에서 주간/야간에 맞춰 칠한다 -->
+    <style name="Theme.DriveMate" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

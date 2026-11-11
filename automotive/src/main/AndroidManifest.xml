@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature
+        android:name="android.hardware.type.automotive"
+        android:required="true" />
+
+    <!--
+      앱 카테고리: android:appCategory를 일부러 지정하지 않는다.
+      (예전의 "audio"는 코칭 앱과 맞지 않았다. 안드로이드가 정한 값 중 "운전 보조"에 해당하는 것이 없고,
+       Pleos 카테고리(Mobility Services / Lifestyle 등)를 매니페스트에서 선언하는 방법은 문서에서 찾지 못했다.
+       Pleos 앱 등록 시 카테고리를 선택하거나 partnership@pleos.ai 로 확인한다.)
+    -->
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.DriveMate">
+
+        <!-- It declares support for Android Automotive OS -->
+        <meta-data
+            android:name="com.android.automotive"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!-- 앱의 화면(DriveMateActivity)은 shared 모듈 매니페스트에 선언돼 있다 -->
+    </application>
+
+</manifest>

@@ -1,0 +1,35 @@
+{
+  "packageName": "com.example.drivemate",
+  "appDescription": "A driving coach app that gives beginner drivers spoken feedback on speeding and sharp curves and tracks their progress toward graduating from the coach.",
+  "invokeWord": "드라이브메이트",
+  "version": "1.0.0",
+  "actionCalls": [
+    {
+      "type": "function",
+      "function": {
+        "name": "GET_DRIVING_STATUS",
+        "description": "Tell the driver how their current trip is going, including any speeding or sharp curve mistakes so far.",
+        "parameters": { "type": "object", "properties": {}, "required": [] },
+        "component": "service"
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "GET_TRIP_DISTANCE",
+        "description": "Tell the driver how far they have driven on the current or most recent trip.",
+        "parameters": { "type": "object", "properties": {}, "required": [] },
+        "component": "service"
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "GET_GRADUATION_PROGRESS",
+        "description": "Tell the driver how close they are to graduating from the driving coach.",
+        "parameters": { "type": "object", "properties": {}, "required": [] },
+        "component": "service"
+      }
+    }
+  ]
+}

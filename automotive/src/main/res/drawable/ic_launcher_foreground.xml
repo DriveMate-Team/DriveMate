@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  앱 아이콘 앞면: 핸들(운전) + 졸업 모자(졸업 = 이 앱의 핵심)
+  108x108 캔버스 중앙의 지름 66 원(안전 영역) 안에 모두 들어오게 그렸다.
+  핸들: 흰색 고리 + 가운데 허브 + 3개 살 / 모자: 노랑
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 핸들 고리 (중심 54,64 / 반지름 20) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:pathData="M54,64m-20,0a20,20 0 1,0 40,0a20,20 0 1,0 -40,0" />
+    <!-- 핸들 허브 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,64m-6,0a6,6 0 1,0 12,0a6,6 0 1,0 -12,0" />
+    <!-- 핸들 살: 왼쪽, 오른쪽, 아래 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M34,64L47,64M61,64L74,64M54,70L54,84" />
+
+    <!-- 졸업 모자 아랫부분 -->
+    <path
+        android:fillColor="#FFA000"
+        android:pathData="M39,37L54,43L69,37L69,46Q54,53 39,46Z" />
+    <!-- 졸업 모자 윗판(마름모) -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M54,21L80,32L54,43L28,32Z" />
+    <!-- 모자 술 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFC107"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M78,33L78,45" />
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M78,46m-2.5,0a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0" />
+</vector>

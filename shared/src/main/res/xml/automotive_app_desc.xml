@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 템플릿(Car App Library)을 쓰지 않는 일반 화면 앱이라 <uses name="template" />를 선언하지 않는다 -->
+<automotiveApp />

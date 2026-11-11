@@ -98,7 +98,6 @@ class DriveSession @Inject constructor(
     // 말하려고 기다리는 코칭 (내비가 말하는 중이면 잠시 기다렸다가 말한다)
     private var pending: Coaching? = null
     private var pendingManeuverId = 0
-    private var pendingDeadline = 0L
     private var bubbleManeuverId: Int? = null // 지금 말풍선이 어느 회전에 대한 것인지
 
     init {
@@ -172,9 +171,13 @@ class DriveSession @Inject constructor(
             repo.updateTrip(trip.copy(endTime = System.currentTimeMillis(), distanceM = distanceM.toInt()))
             // 리포트의 "다음 목표 1개"를 저장해 두었다가 다음 주행의 홈 화면에 보여준다
             val report = ReportBuilder.build(events, questions)
-            repo.saveProfile(
-                repo.getProfile().copy(goalTitle = report.goal.title, goalDetail = "지난 주행 · ${report.goal.detail}")
-            )
+            // 단, 아주 짧고 기록도 없는 주행은 지난 목표를 그대로 둔다 (300m 달리고 "코칭을 줄여 보자"는 섣부르다)
+            val tooShortToJudge = distanceM < MIN_GOAL_TRIP_M && events.isEmpty() && questions.isEmpty()
+            if (!tooShortToJudge) {
+                repo.saveProfile(
+                    repo.getProfile().copy(goalTitle = report.goal.title, goalDetail = "지난 주행 · ${report.goal.detail}")
+                )
+            }
             Log.i(TAG, "TRIP END id=$id distance=${distanceM.toInt()}m events=${events.size} questions=${questions.size} goal=${report.goal.title}")
             speechOut.speak("수고하셨어요. 오늘의 주행 리포트를 준비했어요.")
             _finished.emit(id)
@@ -276,7 +279,6 @@ class DriveSession @Inject constructor(
         if (coaching != null && next != null) {
             pending = coaching
             pendingManeuverId = next.id
-            pendingDeadline = System.currentTimeMillis() + PENDING_WAIT_MS
         }
         trySpeakPending()
 
@@ -290,7 +292,9 @@ class DriveSession @Inject constructor(
     // 기다리던 코칭을 말할 수 있으면 말한다
     private fun trySpeakPending() {
         val coaching = pending ?: return
-        if (System.currentTimeMillis() > pendingDeadline) {   // 너무 오래 기다렸으면 포기 (늦은 안내는 방해가 된다)
+        // 기다리는 사이 그 회전을 지나갔거나 너무 가까워졌으면 포기한다 (늦은 안내는 방해가 된다)
+        val next = navi.state.value.next
+        if (next?.id != pendingManeuverId || next.distanceM < PENDING_GIVE_UP_M) {
             pending = null
             return
         }
@@ -376,6 +380,7 @@ class DriveSession @Inject constructor(
         const val TAG = "DriveMate"
         const val AUTO_START_KMH = 5f        // 이 속도 이상으로 움직이면 자동으로 주행 시작
         const val MIN_TRIP_M = 30            // 이보다 짧고 기록도 없는 주행은 남기지 않는다
-        const val PENDING_WAIT_MS = 8_000L   // 내비 안내가 끝나기를 기다리는 최대 시간
+        const val MIN_GOAL_TRIP_M = 500      // 이보다 짧고 기록도 없는 주행은 "다음 목표"를 바꾸지 않는다
+        const val PENDING_GIVE_UP_M = 120    // 내비 안내·질문 답변이 끝나기를 기다리다 이 거리 안으로 들어오면 코칭을 포기
     }
 }

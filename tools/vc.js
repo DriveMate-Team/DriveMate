@@ -8,7 +8,8 @@
  *   POST /browser/session?client=<id>      <- 하트비트 (아래 "중요" 참고)
  *   PUT /vehicle/body?door_fl=true|false    (door_fl / door_fr / door_rl / door_rr = 문 열림)
  *   PUT /vehicle/gear?gear=Park|Reverse|Neutral|Drive
- *   PUT /vehicle/controls?speed=<km/h>&accelerator=0&brake=0&steering=<deg>
+ *   PUT /vehicle/controls?speed=<km/h>&accelerator=0&brake=<0~100>&steering=<deg>
+ *   PUT /vehicle/turn-signal?mode=Off|BlinkLeft|BlinkRight     (방향지시등)
  *
  * 중요 - 하트비트:
  *   Virtual Console은 "브라우저 페이지가 열려 있다"는 신호(1초마다 POST /browser/session)가 3초 이상 끊기면
@@ -33,6 +34,8 @@
  *   speed <km/h>          속도를 바로 바꿈
  *   ramp <km/h> <초>      지금 속도에서 목표 속도까지 1초 단위로 서서히 바꿈 (데모에서 자연스러움)
  *   steer <도>            조향각 변경
+ *   signal <left|right|off>   방향지시등(깜빡이) 켜기/끄기
+ *   brake <0~100>         브레이크 페달 밟은 정도(%) (0 = 뗌)
  *   door <fl|fr|rl|rr> <open|close>   문 열기/닫기 (앞왼쪽=운전석, 앞오른쪽, 뒤왼쪽, 뒤오른쪽)
  *   wait <초>             기다리기
  *   park                  속도 0 -> (감속이 끝날 때까지 기다림) -> 기어 P
@@ -100,14 +103,14 @@ async function getState() {
 }
 
 // 콘솔은 speed/accelerator/brake/steering을 한 번에 보낸다. 바꾸지 않을 값은 현재 값을 그대로 유지한다.
-async function putControls({ speed, steer }) {
+async function putControls({ speed, steer, brake }) {
   const cur = await getState();
   const sp = speed ?? cur.speed ?? 0;
   const st = steer ?? cur.steer ?? 0;
   const q = new URLSearchParams({
     speed: String(Math.round(sp)),
     accelerator: '0',
-    brake: '0',
+    brake: String(Math.round(brake ?? 0)),
     steering: String(Math.round(st)),
   });
   await http('PUT', '/vehicle/controls?' + q);
@@ -141,6 +144,21 @@ async function setSteer(v) {
   clamp(v, STEER_RANGE, '조향각');
   await putControls({ steer: v });
   console.log(`  조향각 -> ${v}°`);
+}
+
+// 방향지시등: left / right / off
+async function setSignal(which) {
+  const mode = { left: 'BlinkLeft', right: 'BlinkRight', off: 'Off' }[String(which).toLowerCase()];
+  if (!mode) throw new Error('방향지시등은 left/right/off 중 하나여야 합니다 (받은 값: ' + which + ')');
+  await http('PUT', '/vehicle/turn-signal?mode=' + mode);
+  console.log(`  방향지시등 -> ${mode}`);
+}
+
+// 브레이크 페달 (0~100%)
+async function setBrake(v) {
+  clamp(v, [0, 100], '브레이크');
+  await putControls({ brake: v });
+  console.log(`  브레이크 -> ${v}%`);
 }
 
 // 문 열기/닫기: 콘솔의 body API (door_fl / door_fr / door_rl / door_rr)
@@ -206,6 +224,8 @@ async function runStep(text) {
     case 'ramp': return ramp(Number(a[0]), Number(a[1] ?? 5));
     case 'door': return setDoor(a[0], a[1]);
     case 'steer': return setSteer(Number(a[0]));
+    case 'signal': return setSignal(a[0]);
+    case 'brake': return setBrake(Number(a[0]));
     case 'wait': return wait(Number(a[0]));
     case 'park': return park();
     case 'until': return until(Number(a[0]), Number(a[1] ?? 30));

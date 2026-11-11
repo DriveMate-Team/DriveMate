@@ -61,6 +61,7 @@ class PleosSpeechOutput @Inject constructor(
     private var started = false
     private var ready = false
     private var onDone: (() -> Unit)? = null
+    private var startedAt = 0L
 
     // "끝났다"는 신호가 안 오는 사고를 대비한 안전장치: 20초 뒤 강제로 끝난 것으로 처리
     private val timeout = Runnable { finish() }
@@ -101,10 +102,11 @@ class PleosSpeechOutput @Inject constructor(
         _speaking.value = true
         this.onDone = onDone
         Log.i(TAG, "SAY: $text")   // 테스트에서 "무슨 말을 했는지" 확인하는 기록
+        startedAt = System.currentTimeMillis()
         handler.removeCallbacks(timeout)
         handler.postDelayed(timeout, 20_000L)
         try {
-            tts.speak(text, false)
+            tts.speak(text, true)   // 두 번째 값은 SDK 기본값(true)을 그대로 쓴다. false로 주면 "끝났다"는 신호가 오지 않는다 (에뮬레이터로 확인)
         } catch (e: Exception) {
             Log.w(TAG, "TTS speak 오류: ${e.message}")
             finish()
@@ -122,6 +124,7 @@ class PleosSpeechOutput @Inject constructor(
         handler.removeCallbacks(timeout)
         if (!_speaking.value) return
         _speaking.value = false
+        Log.i(TAG, "SAY DONE (${System.currentTimeMillis() - startedAt}ms)")
         val callback = onDone
         onDone = null
         callback?.invoke()

@@ -134,13 +134,14 @@ class PleosNaviSource @Inject constructor(
         }
     }
 
-    // 1초마다 내비에 "경로 상태 / 다음 안내"를 물어본다 (답은 위 listener로 온다)
+    // 내비에 "경로 상태 / 다음 안내"를 물어본다 (답은 위 listener로 온다).
+    // 경로 안내 중에는 1초마다 다음 안내를 묻고, 경로가 없을 때는 5초에 한 번만 상태를 묻는다 (불필요한 호출 줄이기).
     private fun startPolling() {
         scope.launch {
             var tick = 0
             while (true) {
                 try {
-                    helper.getRouteStateInfo()
+                    if (tick % 5 == 0) helper.getRouteStateInfo()
                     if (_state.value.hasRoute) {
                         helper.getTBTInfo()
                         if (tick % 10 == 0) helper.getDestinationInfo()

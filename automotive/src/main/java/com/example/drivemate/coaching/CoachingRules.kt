@@ -37,7 +37,7 @@ class CoachingRules {
         if (next.distanceM < TOO_LATE_M) return null                // 너무 가까우면 말하지 않는다 (회전 중에 말 걸지 않기)
         if (!isWanted(next.type, mode, topics)) return null
 
-        val coaching = messageFor(next.type) ?: return null
+        val coaching = messageFor(next.type, mode) ?: return null
         announced.add(next.id)
         return coaching
     }
@@ -63,8 +63,23 @@ class CoachingRules {
         fun announceDistance(type: ManeuverType): Int =
             if (type == ManeuverType.INTERSECTION) INTERSECTION_ANNOUNCE_M else TURN_ANNOUNCE_M
 
-        /** 상황별 문구 (음성 문구는 참가신청서 예시 그대로) */
-        fun messageFor(type: ManeuverType): Coaching? = when (type) {
+        /**
+         * 상황별 문구.
+         * 초보(자세히): 참가신청서 예시 문장 그대로. 일반(간단히): 짧은 문장 (팀 초안 2026-11-13)
+         */
+        fun messageFor(type: ManeuverType, mode: DriveMode = DriveMode.BEGINNER): Coaching? =
+            if (mode == DriveMode.NORMAL) shortMessageFor(type) else detailedMessageFor(type)
+
+        /** 간단히: 상황 이름 + 확인할 것 하나만 */
+        fun shortMessageFor(type: ManeuverType): Coaching? = when (type) {
+            ManeuverType.LEFT -> Coaching("LEFT", "곧 좌회전이에요. 신호 확인해 주세요.", "곧 좌회전이에요. 신호 확인해 주세요.")
+            ManeuverType.RIGHT -> Coaching("RIGHT", "곧 우회전이에요. 보행자 확인해 주세요.", "곧 우회전이에요. 보행자 확인해 주세요.")
+            ManeuverType.INTERSECTION -> Coaching("INTERSECTION", "교차로예요. 속도 줄여 주세요.", "교차로예요. 속도 줄여 주세요.")
+            ManeuverType.OTHER -> null
+        }
+
+        /** 자세히: 신청서 예시 문장 */
+        fun detailedMessageFor(type: ManeuverType): Coaching? = when (type) {
             ManeuverType.LEFT -> Coaching(
                 key = "LEFT",
                 speech = "곧 좌회전 구간이에요. 진행할 차로와 신호를 미리 확인해 주세요.",

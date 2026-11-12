@@ -137,8 +137,8 @@ fun PrepScreen(onBack: () -> Unit, viewModel: PrepViewModel = hiltViewModel()) {
                 }
             }
             Text(
-                if (mode == DriveMode.BEGINNER) "좌회전·우회전이 다가오면 항상 미리 알려드려요."
-                else "아래에서 고른 연습 주제만 미리 알려드려요.",
+                if (mode == DriveMode.BEGINNER) "좌회전·우회전이 다가오면 항상 자세히 알려드려요."
+                else "아래에서 고른 연습 주제만 짧게 알려드려요.",
                 style = DmType.sub, color = colors.textSub,
             )
         }

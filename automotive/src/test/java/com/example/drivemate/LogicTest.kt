@@ -77,6 +77,11 @@ class CoachingRulesTest {
         assertNotNull(rules.onNavi(Maneuver(2, left, 300), DriveMode.BEGINNER, emptySet(), 5_000))  // 5초 뒤 다른 좌회전
     }
 
+    @Test fun `일반 모드는 간단한 문구로 말한다`() {
+        val c = CoachingRules().onNavi(Maneuver(1, right, 300), DriveMode.NORMAL, setOf(Topic.RIGHT_TURN), 0)
+        assertEquals("곧 우회전이에요. 보행자 확인해 주세요.", c?.speech)
+    }
+
     @Test fun `너무 가까우면 안내하지 않는다`() {
         assertNull(CoachingRules().onNavi(Maneuver(1, right, 40), DriveMode.BEGINNER, emptySet(), 0))
     }

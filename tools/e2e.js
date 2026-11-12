@@ -6,7 +6,8 @@
  *
  * 하는 일:
  *   1) 앱을 새로 켜고 데모 경로(2km: 400m 우회전, 800m 교차로, 1300m 좌회전, 1700m 우회전)로 주행을 시작
- *   2) Virtual Console로 기어 D, 시속 50km로 달리면서 "달린 거리"에 맞춰 조작
+ *   2) Virtual Console로 기어 D, 시속 50km까지 "1초에 5km씩" 천천히 올리며 달리고, "달린 거리"에 맞춰 조작
+ *      (에뮬레이터는 목표 속도를 주면 1초 안에 바로 도달해서, 한 번에 50을 주면 급가속(1초 11km 이상)으로 기록된다)
  *        - 첫 우회전: 깜빡이를 켜지 않음            -> 리포트에 "깜빡이 기록 없음"
  *        - 교차로 앞(100m 안): 급하게 감속           -> 리포트에 "교차로 앞 급감속"
  *        - 900m: 질문 "비보호 좌회전은 언제 해"       -> 음성 답변 + 질문 기록
@@ -46,6 +47,16 @@ const controls = (c) => {
   target = { ...target, ...c };
   return put(`/vehicle/controls?speed=${target.speed}&accelerator=0&brake=${target.brake}&steering=0`);
 };
+// 천천히 속도 바꾸기: 원하는 속도(desired)만 정해 두면, 아래 주행 반복문이 1초마다 RAMP_STEP씩 다가간다
+const RAMP_STEP = 5;   // km/h. 급가속 기준(11)·급감속 기준(7.5)보다 작게
+let desired = 0;
+let lastRampAt = 0;
+async function rampTick() {
+  if (Date.now() - lastRampAt < 1000 || target.speed === desired) return;
+  lastRampAt = Date.now();
+  const diff = desired - target.speed;
+  await controls({ speed: target.speed + Math.sign(diff) * Math.min(RAMP_STEP, Math.abs(diff)) });
+}
 const signal = (mode) => put('/vehicle/turn-signal?mode=' + mode);
 const gear = (name) => put('/vehicle/gear?gear=' + name);
 
@@ -87,9 +98,9 @@ async function main() {
   tapText('출발하기');
   await sleep(1500);
 
-  console.log('3) 주행: 기어 D, 시속 50km');
+  console.log('3) 주행: 기어 D, 시속 50km까지 천천히');
   await gear('Drive');
-  await controls({ speed: 50 });
+  desired = 50;
 
   // 달린 거리를 속도로 적분한다 (앱의 데모 경로와 같은 방식)
   let dist = 0;
@@ -104,14 +115,15 @@ async function main() {
   };
   while (dist < 1790) {
     await sleep(200);
+    await rampTick();
     const s = await state();
     const now = Date.now();
     dist += (Number(s.controls.speed_kph) / 3.6) * (now - last) / 1000;
     last = now;
 
     await once('우회전 코칭이 나온 뒤 화면 저장', 200, async () => shot('e2e_3_drive_coaching.png'));
-    await once('교차로 앞: 급하게 감속 (브레이크)', 720, async () => controls({ speed: 15, brake: 80 }));
-    await once('다시 시속 50km', 790, async () => controls({ speed: 50, brake: 0 }));
+    await once('교차로 앞: 급하게 감속 (브레이크, 일부러 급감속)', 720, async () => { desired = 15; await controls({ speed: 15, brake: 80 }); });
+    await once('다시 시속 50km까지 천천히', 790, async () => { await controls({ brake: 0 }); desired = 50; });
     await once('질문: 비보호 좌회전은 언제 해', 900, async () => {
       adb('shell', 'am', 'start', '--user', '10', '-n', `${PKG}/.MainActivity`, '--es', 'ask', "'비보호 좌회전은 언제 해'");
       await sleep(1200);
@@ -121,7 +133,9 @@ async function main() {
     await once('좌회전 지남: 깜빡이 끔', 1320, async () => signal('Off'));
   }
 
-  console.log('4) 주차: 속도 0 -> 기어 P');
+  console.log('4) 주차: 천천히 속도 0 -> 기어 P');
+  desired = 0;
+  for (let i = 0; i < 40 && target.speed > 0; i++) { await rampTick(); await sleep(250); }
   await controls({ speed: 0, brake: 30 });
   for (let i = 0; i < 150; i++) {
     if (Number((await state()).controls.speed_kph) < 1) break;
@@ -147,6 +161,7 @@ async function main() {
     ['우회전 깜빡이 기록 없음', /EVENT: TURN .*direction=RIGHT signalUsed=false/],
     ['좌회전 깜빡이 기록 있음', /EVENT: TURN .*direction=LEFT signalUsed=true/],
     ['주행 종료와 다음 목표', /TRIP END .*goal=/],
+    ['천천히 출발하면 급가속 기록 없음', { test: (l) => !/EVENT: HARD_ACCEL/.test(l) }],
   ];
   let failed = 0;
   console.log('===== 기대와 비교 =====');

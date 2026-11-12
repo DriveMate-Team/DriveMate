@@ -9,9 +9,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.drivemate.R
 
 /*
  * 설계문서 3단계 디자인 표를 코드로 옮긴 곳. 화면은 색·글자 크기를 직접 쓰지 않고 여기 값만 쓴다.
@@ -74,12 +77,22 @@ val DarkColors = DmColors(
     outline = Color(0xFF3A3F4A),
 )
 
+/**
+ * 글꼴: Pretendard (설계문서 3단계). res/font 폴더의 글꼴 파일 3개(보통·중간·굵게)를 쓴다.
+ * 라이선스: SIL Open Font License 1.1 (docs/LICENSE_Pretendard.txt). 앱에 넣어 배포해도 된다.
+ */
+val Pretendard = FontFamily(
+    Font(R.font.pretendard_regular, FontWeight.Normal),
+    Font(R.font.pretendard_medium, FontWeight.Medium),
+    Font(R.font.pretendard_bold, FontWeight.Bold),
+)
+
 /** 글자 크기 (설계문서: 코칭 문구 40sp, 제목 32sp, 본문 24sp, 보조 20sp. 20sp보다 작은 글자는 쓰지 않는다) */
 object DmType {
-    val coaching = TextStyle(fontSize = 40.sp, lineHeight = 54.sp, fontWeight = FontWeight.Bold)
-    val title = TextStyle(fontSize = 32.sp, lineHeight = 42.sp, fontWeight = FontWeight.Bold)
-    val body = TextStyle(fontSize = 24.sp, lineHeight = 34.sp, fontWeight = FontWeight.Medium)
-    val sub = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Normal)
+    val coaching = TextStyle(fontFamily = Pretendard, fontSize = 40.sp, lineHeight = 54.sp, fontWeight = FontWeight.Bold)
+    val title = TextStyle(fontFamily = Pretendard, fontSize = 32.sp, lineHeight = 42.sp, fontWeight = FontWeight.Bold)
+    val body = TextStyle(fontFamily = Pretendard, fontSize = 24.sp, lineHeight = 34.sp, fontWeight = FontWeight.Medium)
+    val sub = TextStyle(fontFamily = Pretendard, fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Normal)
 }
 
 /** 크기 (설계문서: 버튼 최소 96×96dp, 마이크 140dp, 모서리 24dp) */
@@ -101,7 +114,7 @@ object DmTheme {
 
 /**
  * 앱 전체를 감싸는 테마. 야간이면 어두운 색 묶음을 쓴다.
- * 글꼴은 시스템 기본 글꼴을 쓴다 (Pretendard/Asta Sans 중 무엇을 넣을지는 팀 결정 후 반영).
+ * 글꼴은 Pretendard (위 DmType의 모든 글자 스타일에 들어 있다).
  */
 @Composable
 fun DriveMateTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {

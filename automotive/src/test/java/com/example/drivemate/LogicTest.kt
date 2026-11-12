@@ -331,6 +331,10 @@ class AnswerEngineTest {
     @Test fun `목록에 없는 질문은 정차 후 다시 물어봐 달라고 한다`() {
         assertEquals("그 질문은 정차 후 다시 물어봐 주세요.", engine.answer("오늘 날씨 어때", emptySet()).text)
     }
+
+    @Test fun `주차 후 목록에 없는 질문은 물어볼 수 있는 것을 안내한다`() {
+        assertEquals(KeywordAnswerEngine.UNKNOWN_ANSWER_PARKED, engine.answer("오늘 날씨 어때", emptySet(), ctx()).text)
+    }
 }
 
 /** Pleos 디자인 가이드: 글자 대비 4.5:1 이상 (주간·야간 색 묶음 모두) */

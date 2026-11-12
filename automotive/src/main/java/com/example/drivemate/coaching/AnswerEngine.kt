@@ -72,11 +72,15 @@ class KeywordAnswerEngine : AnswerEngine {
             // 받침이 있으면 "이에요", 없으면 "예요" (예: "차선 변경이에요" / "교차로예요")
             return Answer(null, "오늘 연습 주제는 $label${ReportBuilder.josa(label, "이에요", "예요")}.")
         }
-        return Answer(null, UNKNOWN_ANSWER)
+        // 주차 후(리포트 화면)에는 "정차 후 다시"가 맞지 않으므로 물어볼 수 있는 것을 안내한다
+        return Answer(null, if (trip?.live == false) UNKNOWN_ANSWER_PARKED else UNKNOWN_ANSWER)
     }
 
     companion object {
         /** 목록에 없는 질문일 때의 답 (설계문서 4단계) */
         const val UNKNOWN_ANSWER = "그 질문은 정차 후 다시 물어봐 주세요."
+
+        /** 주차 후 목록에 없는 질문일 때의 답 (2026-11-13 결정) */
+        const val UNKNOWN_ANSWER_PARKED = "그 질문은 아직 답할 수 없어요. 오늘 주행 기록이나 운전 방법을 물어봐 주세요."
     }
 }

@@ -13,6 +13,7 @@ import com.example.drivemate.model.EventType
 import com.example.drivemate.model.Maneuver
 import com.example.drivemate.model.ManeuverType
 import com.example.drivemate.model.Topic
+import com.example.drivemate.model.TurnSignal
 import com.example.drivemate.report.CardKind
 import com.example.drivemate.report.ReportBuilder
 import com.example.drivemate.ui.theme.DarkColors
@@ -81,50 +82,60 @@ class CoachingRulesTest {
 class EventDetectorTest {
     @Test fun `1초에 시속 7_5km 이상 줄면 급감속`() {
         val d = EventDetector()
-        assertTrue(d.onSample(50f, null, false, 0).isEmpty())
-        assertTrue(d.onSample(43f, null, false, 1000).isEmpty())            // 7km 감소: 아님
-        val events = d.onSample(35f, null, false, 2000)                     // 8km 감소: 급감속
+        assertTrue(d.onSample(50f, null, emptySet(), 0).isEmpty())
+        assertTrue(d.onSample(43f, null, emptySet(), 1000).isEmpty())            // 7km 감소: 아님
+        val events = d.onSample(35f, null, emptySet(), 2000)                     // 8km 감소: 급감속
         assertEquals(listOf(DetectedEvent.HardBrake(43f, nearTurn = false)), events)
-        assertTrue(d.onSample(26f, null, false, 3000).isEmpty())            // 이어지는 감속은 다시 기록하지 않음
+        assertTrue(d.onSample(26f, null, emptySet(), 3000).isEmpty())            // 이어지는 감속은 다시 기록하지 않음
     }
 
     @Test fun `1초에 시속 11km 이상 늘면 급가속이고 정차 직후면 출발 때로 표시`() {
         val d = EventDetector()
-        d.onSample(0f, null, false, 0)
-        val events = d.onSample(12f, null, false, 1000)
+        d.onSample(0f, null, emptySet(), 0)
+        val events = d.onSample(12f, null, emptySet(), 1000)
         assertEquals(listOf(DetectedEvent.HardAccel(12f, fromStop = true)), events)
 
         val d2 = EventDetector()
-        d2.onSample(40f, null, false, 0)
-        assertTrue(d2.onSample(50f, null, false, 1000).isEmpty())           // 10km 증가: 아님
-        d2.onSample(50f, null, false, 2000)
-        assertEquals(listOf(DetectedEvent.HardAccel(62f, fromStop = false)), d2.onSample(62f, null, false, 3000))
+        d2.onSample(40f, null, emptySet(), 0)
+        assertTrue(d2.onSample(50f, null, emptySet(), 1000).isEmpty())           // 10km 증가: 아님
+        d2.onSample(50f, null, emptySet(), 2000)
+        assertEquals(listOf(DetectedEvent.HardAccel(62f, fromStop = false)), d2.onSample(62f, null, emptySet(), 3000))
     }
 
     @Test fun `교차로 100m 안의 급감속은 nearTurn`() {
         val d = EventDetector()
-        d.onSample(50f, Maneuver(1, ManeuverType.INTERSECTION, 90), false, 0)
-        val events = d.onSample(40f, Maneuver(1, ManeuverType.INTERSECTION, 78), false, 1000)
+        d.onSample(50f, Maneuver(1, ManeuverType.INTERSECTION, 90), emptySet(), 0)
+        val events = d.onSample(40f, Maneuver(1, ManeuverType.INTERSECTION, 78), emptySet(), 1000)
         assertEquals(listOf(DetectedEvent.HardBrake(50f, nearTurn = true)), events)
     }
 
     @Test fun `회전 100m 안에서 깜빡이를 켰는지 기록한다`() {
         val d = EventDetector()
-        d.onSample(40f, Maneuver(1, ManeuverType.RIGHT, 150), true, 0)      // 100m 밖에서 켠 것은 세지 않음
-        d.onSample(40f, Maneuver(1, ManeuverType.RIGHT, 90), false, 1000)
-        d.onSample(38f, Maneuver(1, ManeuverType.RIGHT, 10), false, 2000)
-        val passed = d.onSample(36f, Maneuver(2, ManeuverType.LEFT, 500), false, 3000)
+        d.onSample(40f, Maneuver(1, ManeuverType.RIGHT, 150), setOf(TurnSignal.RIGHT), 0)      // 100m 밖에서 켠 것은 세지 않음
+        d.onSample(40f, Maneuver(1, ManeuverType.RIGHT, 90), emptySet(), 1000)
+        d.onSample(38f, Maneuver(1, ManeuverType.RIGHT, 10), emptySet(), 2000)
+        val passed = d.onSample(36f, Maneuver(2, ManeuverType.LEFT, 500), emptySet(), 3000)
         assertEquals(listOf(DetectedEvent.TurnPassed(ManeuverType.RIGHT, signalUsed = false, speedKmh = 36f)), passed)
 
-        d.onSample(36f, Maneuver(2, ManeuverType.LEFT, 80), true, 4000)     // 100m 안에서 켬
-        val passed2 = d.onSample(36f, null, false, 5000)
-        assertEquals(listOf(DetectedEvent.TurnPassed(ManeuverType.LEFT, signalUsed = true, speedKmh = 36f)), passed2)
+        d.onSample(36f, Maneuver(2, ManeuverType.LEFT, 80), setOf(TurnSignal.LEFT), 4000)     // 100m 안에서 켬
+        val passed2 = d.onSample(36f, null, emptySet(), 5000)
+        assertEquals(listOf(DetectedEvent.TurnPassed(ManeuverType.LEFT, signalUsed = true, speedKmh = 36f, signalsSeen = setOf(TurnSignal.LEFT))), passed2)
+    }
+
+    @Test fun `반대쪽 깜빡이만 켰으면 작동 기록으로 세지 않는다`() {
+        val d = EventDetector()
+        d.onSample(40f, Maneuver(1, ManeuverType.RIGHT, 80), setOf(TurnSignal.LEFT), 0)   // 우회전인데 왼쪽 깜빡이
+        val passed = d.onSample(40f, null, emptySet(), 1000)
+        assertEquals(
+            listOf(DetectedEvent.TurnPassed(ManeuverType.RIGHT, signalUsed = false, speedKmh = 40f, signalsSeen = setOf(TurnSignal.LEFT))),
+            passed,
+        )
     }
 
     @Test fun `교차로 직진은 회전 이벤트로 기록하지 않는다`() {
         val d = EventDetector()
-        d.onSample(40f, Maneuver(1, ManeuverType.INTERSECTION, 50), false, 0)
-        assertTrue(d.onSample(40f, null, false, 1000).isEmpty())
+        d.onSample(40f, Maneuver(1, ManeuverType.INTERSECTION, 50), emptySet(), 0)
+        assertTrue(d.onSample(40f, null, emptySet(), 1000).isEmpty())
     }
 }
 

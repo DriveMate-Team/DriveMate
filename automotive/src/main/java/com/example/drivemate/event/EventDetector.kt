@@ -2,6 +2,7 @@ package com.example.drivemate.event
 
 import com.example.drivemate.model.Maneuver
 import com.example.drivemate.model.ManeuverType
+import com.example.drivemate.model.TurnSignal
 
 /** EventDetector가 찾아낸 이벤트 */
 sealed interface DetectedEvent {
@@ -11,8 +12,17 @@ sealed interface DetectedEvent {
     /** 급가속. fromStop = 정차했다가 출발하는 중에 생겼는지 */
     data class HardAccel(val speedKmh: Float, val fromStop: Boolean) : DetectedEvent
 
-    /** 회전 구간을 지나감. signalUsed = 회전 지점 앞 100m 안에서 방향지시등이 켜진 기록이 있는지 */
-    data class TurnPassed(val type: ManeuverType, val signalUsed: Boolean, val speedKmh: Float) : DetectedEvent
+    /**
+     * 회전 구간을 지나감.
+     * @param signalUsed 회전 지점 앞 100m 안에서 "회전 방향과 같은 쪽" 방향지시등이 켜진 기록이 있는지
+     * @param signalsSeen 100m 안에서 켜진 방향지시등 쪽 (비어 있으면 기록 없음, 반대쪽만 있으면 반대쪽 기록)
+     */
+    data class TurnPassed(
+        val type: ManeuverType,
+        val signalUsed: Boolean,
+        val speedKmh: Float,
+        val signalsSeen: Set<TurnSignal> = emptySet(),
+    ) : DetectedEvent
 }
 
 /**
@@ -37,33 +47,35 @@ class EventDetector {
     private var trackedId: Int? = null
     private var trackedType = ManeuverType.OTHER
     private var cameWithinRange = false   // 100m 안까지 들어왔는지
-    private var signalSeen = false        // 100m 안에서 방향지시등이 켜진 적이 있는지
+    private val signalsSeen = mutableSetOf<TurnSignal>()   // 100m 안에서 켜진 방향지시등 쪽 (왼쪽/오른쪽)
 
     /**
      * 약 1초마다 부른다.
      *
-     * @param signalOn 지난 호출 이후로 방향지시등이 한 번이라도 켜졌는지 (좌/우 구분 없이 "작동 여부"만 본다)
+     * @param signals 지난 호출 이후로 켜졌던 방향지시등 쪽 (예: {LEFT}). OFF는 넣지 않는다
      * @return 이번에 새로 생긴 이벤트들 (대부분은 빈 목록)
      */
-    fun onSample(speedKmh: Float, next: Maneuver?, signalOn: Boolean, nowMs: Long): List<DetectedEvent> {
+    fun onSample(speedKmh: Float, next: Maneuver?, signals: Set<TurnSignal>, nowMs: Long): List<DetectedEvent> {
         val events = mutableListOf<DetectedEvent>()
 
         // ---------- 1) 회전 구간 통과 ----------
         if (next?.id != trackedId) {
             // 추적하던 회전이 사라졌거나 다음 회전으로 바뀜 = 그 회전을 지나갔다
             if (trackedId != null && cameWithinRange && trackedType.isTurn()) {
-                events += DetectedEvent.TurnPassed(trackedType, signalSeen, speedKmh)
+                // 회전 방향과 같은 쪽 깜빡이를 켰을 때만 "작동 기록 있음"으로 본다 (2026-11-13: 좌우 구분 추가)
+                val correct = if (trackedType == ManeuverType.LEFT) TurnSignal.LEFT else TurnSignal.RIGHT
+                events += DetectedEvent.TurnPassed(trackedType, correct in signalsSeen, speedKmh, signalsSeen.toSet())
             }
             trackedId = next?.id
             trackedType = next?.type ?: ManeuverType.OTHER
             cameWithinRange = false
-            signalSeen = false
+            signalsSeen.clear()
         }
         // 회전·교차로 100m 안인지 (톨게이트·터널 같은 그 밖의 안내는 세지 않는다)
         val nearManeuver = next != null && next.type != ManeuverType.OTHER && next.distanceM <= NEAR_TURN_M
         if (nearManeuver) {
             cameWithinRange = true
-            if (signalOn) signalSeen = true
+            signalsSeen += signals - TurnSignal.OFF
         }
 
         // ---------- 2) 급가속·급감속 ----------
@@ -102,7 +114,7 @@ class EventDetector {
         inAccelEpisode = false
         trackedId = null
         cameWithinRange = false
-        signalSeen = false
+        signalsSeen.clear()
     }
 
     private fun ManeuverType.isTurn() = this == ManeuverType.LEFT || this == ManeuverType.RIGHT

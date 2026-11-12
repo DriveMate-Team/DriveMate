@@ -82,7 +82,7 @@ interface DriveDao {
 /** 데이터베이스 본체. 표가 바뀌면 version을 올려야 한다 */
 @Database(
     entities = [TripEntity::class, EventEntity::class, QuestionEntity::class, ProfileEntity::class],
-    version = 1,
+    version = 2,   // 2: 이벤트에 signalSide(방향지시등 좌우) 추가 (2026-11-13)
     exportSchema = false,
 )
 abstract class DriveDatabase : RoomDatabase() {

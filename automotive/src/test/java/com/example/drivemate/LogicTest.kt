@@ -235,6 +235,15 @@ class ReportBuilderTest {
         assertEquals("주행 중 급감속 1번이 기록됐어요", report.cards.single().fact)
     }
 
+    @Test fun `반대쪽 깜빡이 기록은 카드에서 따로 말한다`() {
+        val opp = turn("RIGHT", false).copy(signalSide = "LEFT")
+        assertEquals("우회전 1번 중 1번은 반대쪽 방향지시등 기록이 있었어요", ReportBuilder.build(listOf(opp), emptyList()).cards[0].fact)
+        assertEquals(
+            "우회전 2번 중 1번은 깜빡이 기록이 없었고, 1번은 반대쪽 방향지시등 기록이 있었어요",
+            ReportBuilder.build(listOf(opp, turn("RIGHT", false)), emptyList()).cards[0].fact,
+        )
+    }
+
     @Test fun `이전 주행과 비교 - 줄면 칭찬, 늘면 사실만, 둘 다 0이면 뺀다`() {
         val prev = listOf(turn("RIGHT", false), turn("RIGHT", false), turn("RIGHT", false), brake(true))
         val now = listOf(turn("RIGHT", false), brake(true), accel(true))

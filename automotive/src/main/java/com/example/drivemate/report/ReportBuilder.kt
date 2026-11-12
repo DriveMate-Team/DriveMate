@@ -84,10 +84,20 @@ object ReportBuilder {
             missedRight == 0 -> Triple("좌회전", turns.count { it.direction == "LEFT" }, missedLeft)
             else -> Triple("회전", turns.size, missedRight + missedLeft)
         }
+        // 회전 방향과 같은 쪽 기록이 없던 회전을 둘로 나눠 사실대로 쓴다 (2026-11-13 팀 요청)
+        //  - 아무 깜빡이 기록도 없음 / 반대쪽 깜빡이 기록만 있음
+        val missedTurns = turns.filter { it.signalUsed == false && (name == "회전" || it.direction == if (name == "우회전") "RIGHT" else "LEFT") }
+        val opposite = missedTurns.count { !it.signalSide.isNullOrBlank() }
+        val none = missed - opposite
+        val fact = when {
+            opposite == 0 -> "$name ${total}번 중 ${missed}번은 깜빡이 기록이 없었어요"
+            none == 0 -> "$name ${total}번 중 ${opposite}번은 반대쪽 방향지시등 기록이 있었어요"
+            else -> "$name ${total}번 중 ${none}번은 깜빡이 기록이 없었고, ${opposite}번은 반대쪽 방향지시등 기록이 있었어요"
+        }
         return Candidate(
             card = ReportCard(
                 CardKind.SIGNAL,
-                "$name ${total}번 중 ${missed}번은 깜빡이 기록이 없었어요",
+                fact,
                 "내비가 300m를 알려주면 바로 켜 보세요",
             ),
             count = missed,

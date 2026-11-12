@@ -42,8 +42,15 @@ class CoachingRules {
             return null
         }
         announced.add(next.id)
-        lastSpokenAt[coaching.key] = nowMs
-        return coaching
+        return coaching   // 반복 방지 시각은 실제로 말했을 때 markSpoken()으로 기록한다
+    }
+
+    /**
+     * 코칭을 실제로 말했을 때 부른다. 이때부터 같은 안내를 REPEAT_COOLDOWN_MS 동안 반복하지 않는다.
+     * (말하지 못하고 버린 코칭까지 세면, 다음 회전의 안내를 놓친다. 에뮬레이터 실제 경로에서 확인)
+     */
+    fun markSpoken(key: String, nowMs: Long) {
+        lastSpokenAt[key] = nowMs
     }
 
     /** 새 주행을 시작할 때 기억을 지운다 */

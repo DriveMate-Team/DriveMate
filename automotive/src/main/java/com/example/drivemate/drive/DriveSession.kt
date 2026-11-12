@@ -143,6 +143,9 @@ class DriveSession @Inject constructor(
             starting = false
             Log.i(TAG, "TRIP START id=$tripId mode=$mode topics=$topics route=${naviNow.hasRoute}")
             startTicker()
+            // 출발 순간의 내비 값으로 코칭을 한 번 판단한다.
+            // (내비 값이 바뀔 때만 판단하면, 출발 전부터 회전이 300m 안에 있을 때 안내를 놓친다. 에뮬레이터에서 확인)
+            onNavi(navi.state.value)
         }
     }
 
@@ -294,13 +297,14 @@ class DriveSession @Inject constructor(
         val coaching = pending ?: return
         // 기다리는 사이 그 회전을 지나갔거나 너무 가까워졌으면 포기한다 (늦은 안내는 방해가 된다)
         val next = navi.state.value.next
-        if (next?.id != pendingManeuverId || next.distanceM < PENDING_GIVE_UP_M) {
+        if (next?.id != pendingManeuverId || next.distanceM < CoachingRules.TOO_LATE_M) {
             pending = null
             return
         }
         if (_state.value.listen != ListenState.IDLE) return   // 질문을 듣거나 답하는 중
         if (speechOut.isNaviSpeaking()) return                // 내비 안내가 끝난 뒤에 말한다
         if (speechOut.speak(coaching.speech)) {
+            rules.markSpoken(coaching.key, System.currentTimeMillis())
             pending = null
             bubbleManeuverId = pendingManeuverId
             _state.update { it.copy(bubble = coaching.bubble) }
@@ -381,6 +385,5 @@ class DriveSession @Inject constructor(
         const val AUTO_START_KMH = 5f        // 이 속도 이상으로 움직이면 자동으로 주행 시작
         const val MIN_TRIP_M = 30            // 이보다 짧고 기록도 없는 주행은 남기지 않는다
         const val MIN_GOAL_TRIP_M = 500      // 이보다 짧고 기록도 없는 주행은 "다음 목표"를 바꾸지 않는다
-        const val PENDING_GIVE_UP_M = 120    // 내비 안내·질문 답변이 끝나기를 기다리다 이 거리 안으로 들어오면 코칭을 포기
     }
 }

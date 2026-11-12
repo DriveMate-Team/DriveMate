@@ -1,5 +1,6 @@
 package com.example.drivemate.vehicle
 
+import ai.pleos.playground.navi.constants.NaviMode
 import ai.pleos.playground.navi.constants.NavigationStatus
 import ai.pleos.playground.navi.constants.TurnType
 import ai.pleos.playground.navi.data.DestinationInfo
@@ -75,15 +76,22 @@ class PleosNaviSource @Inject constructor(
 
     private val listener = object : NaviHelperEventListener {
         override fun onNavigationStatus(status: NavigationStatus) {
+            Log.i(TAG, "NAVI status=$status")   // 내비가 보내는 원본 값 (자주 오지 않아 그대로 남긴다)
             val routing = status == NavigationStatus.ROUTE_DRIVE
             _state.update { if (routing) it.copy(hasRoute = true) else NaviState() }
         }
 
         override fun onRouteStateInfo(info: RouteStateInfo) {
-            if (info.isRouting) _state.update { it.copy(hasRoute = true) } else _state.value = NaviState()
+            // [버그 수정 2026-11-12] 경로 안내 중인지는 isRouting이 아니라 naviMode로 판단한다.
+            // 에뮬레이터 로그 확인: 내비가 안내 중인데도 isRouting=false, naviMode=ROUTE_GUIDING 으로 온다.
+            // (isRouting은 "경로를 계산하는 중"이라는 뜻으로 보인다)
+            val guiding = info.naviMode == NaviMode.ROUTE_GUIDING || info.naviMode == NaviMode.SIMULATION_GUIDING
+            logIfChanged("routeState", "NAVI routeState guiding=$guiding isRouting=${info.isRouting} mode=${info.naviMode}")
+            if (guiding) _state.update { it.copy(hasRoute = true) } else _state.value = NaviState()
         }
 
         override fun onRouteStarted(info: RouteStartInfo) {
+            Log.i(TAG, "NAVI routeStarted $info")
             _state.update { it.copy(hasRoute = true) }
             helper.getDestinationInfo()
         }
@@ -92,22 +100,21 @@ class PleosNaviSource @Inject constructor(
         override fun onRouteCancelled() { _state.value = NaviState() }
 
         override fun onDestinationInfo(info: DestinationInfo) {
+            logIfChanged("destination", "NAVI destination name=${info.name} remain=${info.remainDistance}m")
             val name = info.name.ifBlank { info.address }
             _state.update { it.copy(destination = name.ifBlank { null }) }
         }
 
         override fun onTBTInfo(list: List<TBTInfo>) {
+            // 확인된 형식: distance 단위는 m, 첫 번째가 "바로 다음 안내"(현재 위치부터의 거리),
+            // 두 번째부터는 "앞 안내 지점부터의 거리"다 (모두 더하면 남은 총 거리와 비슷하다).
+            logIfChanged("tbt", "NAVI tbt " + list.take(3).joinToString(" | ") { "${it.type}/${it.distance.toInt()}m/${it.description}" } + " (총 ${list.size}개)")
             val first = list.firstOrNull()
             if (first == null) {
                 _state.update { it.copy(next = null) }
                 return
             }
-            val type = when (first.type) {
-                TurnType.TURN_LEFT, TurnType.TURN_SHARP_L -> ManeuverType.LEFT
-                TurnType.TURN_RIGHT, TurnType.TURN_SHARP_R -> ManeuverType.RIGHT
-                TurnType.TURN_STRAIGHT -> ManeuverType.INTERSECTION
-                else -> ManeuverType.OTHER
-            }
+            val type = first.type.toManeuverType()
             val distance = first.distance.toInt()
             // 종류가 바뀌었거나 남은 거리가 갑자기 늘었으면 "다음 회전으로 넘어간 것"으로 본다
             if (type != lastType || distance > lastDistance + 50) maneuverId++
@@ -155,6 +162,14 @@ class PleosNaviSource @Inject constructor(
         }
     }
 
+    // 같은 내용이면 다시 찍지 않는 로그 (1초마다 오는 값이 로그를 가득 채우지 않게)
+    private val lastLogs = mutableMapOf<String, String>()
+    private fun logIfChanged(key: String, text: String) {
+        if (lastLogs[key] == text) return
+        lastLogs[key] = text
+        Log.i(TAG, text)
+    }
+
     override fun onTripStart() {}
 
     override fun openNavi() {
@@ -182,8 +197,16 @@ class PleosNaviSource @Inject constructor(
     }
 }
 
+/** 내비의 회전 종류를 DriveMate의 상황 종류로 바꾼다 (좌·우회전만 코칭 대상, 직진은 교차로) */
+fun TurnType.toManeuverType(): ManeuverType = when (this) {
+    TurnType.TURN_LEFT, TurnType.TURN_SHARP_L -> ManeuverType.LEFT
+    TurnType.TURN_RIGHT, TurnType.TURN_SHARP_R -> ManeuverType.RIGHT
+    TurnType.TURN_STRAIGHT -> ManeuverType.INTERSECTION
+    else -> ManeuverType.OTHER
+}
+
 /**
- * 테스트·시연용 가짜 경로: 참가신청서 4번 시나리오 "A씨 마트 가는 길".
+ * 테스트·시연용 데모 경로: 참가신청서 4번 시나리오 "A씨 마트 가는 길".
  *
  * 에뮬레이터에는 실제 주행(위치 이동)이 없어서, 차량 속도를 적분해 "달린 거리"를 만들고
  * 미리 정해 둔 지점까지의 남은 거리를 계산한다. 속도는 Virtual Console(tools/vc.js)로 바꾼다.
@@ -232,16 +255,34 @@ class ScenarioNaviSource @Inject constructor(
     }
 
     companion object {
-        const val DESTINATION = "동네 마트 (데모 경로)"
+        const val DESTINATION = "이마트 성남점 (데모 경로)"
         private const val STEP_MS = 500L
 
-        /** 출발점에서부터의 거리(m)와 그 지점의 상황. 총 2km */
-        val ROUTE = listOf(
-            400 to ManeuverType.RIGHT,          // 아파트 단지를 나와 우회전
-            800 to ManeuverType.INTERSECTION,   // 큰 교차로 직진
-            1300 to ManeuverType.LEFT,          // 좌회전
-            1700 to ManeuverType.RIGHT,         // 마트 진입 우회전
+        /**
+         * 에뮬레이터 내비의 실제 경로(성남 수정구 시흥동 -> 이마트 성남점, 추천 경로 7.2km)에서
+         * NaviHelper가 보낸 다음 안내 목록을 그대로 옮긴 것 (2026-11-12 로그).
+         * 각 줄 = (앞 안내 지점부터의 거리 m, 내비의 회전 종류). 에뮬레이터 내비는 움직이지 않아서
+         * 이 거리를 차량 속도로 따라가며 남은 거리를 계산한다.
+         */
+        private val REAL_LEGS = listOf(
+            80 to TurnType.TURN_LEFT,           // 기업지원허브 방면
+            390 to TurnType.TURN_LEFT,          // 성남시청 방면
+            1000 to TurnType.TURN_KEEP_R,       // 대왕판교로
+            70 to TurnType.TURN_RIGHT,          // 성남시청 방면
+            950 to TurnType.TURN_AVOID_OVER_R,  // 판교 방면
+            360 to TurnType.TURN_LEFT,          // 송파 방면
+            1100 to TurnType.TURN_RIGHT,        // 광주 방면
+            330 to TurnType.TURN_ENTER_OVER_L,  // 성남중원경찰서·성남종합운동장 방면
+            2100 to TurnType.TURN_LEFT,         // 성남시의료원 방면
+            520 to TurnType.TURN_LEFT,          // 태평역 방면
+            160 to TurnType.TURN_RIGHT,         // 이마트 방면
+            10 to TurnType.TURN_ARRIVE,         // 도착
         )
+
+        /** 출발점에서부터의 누적 거리(m)와 그 지점의 상황 (위 목록을 더해서 만든다. 총 7,070m) */
+        val ROUTE: List<Pair<Int, ManeuverType>> = REAL_LEGS
+            .runningFold(0 to ManeuverType.OTHER) { acc, (leg, turn) -> (acc.first + leg) to turn.toManeuverType() }
+            .drop(1)
     }
 }
 

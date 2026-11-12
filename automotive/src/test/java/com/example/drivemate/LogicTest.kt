@@ -63,8 +63,15 @@ class CoachingRulesTest {
     @Test fun `같은 안내를 30초 안에 반복하지 않는다`() {
         val rules = CoachingRules()
         assertNotNull(rules.onNavi(Maneuver(1, right, 300), DriveMode.BEGINNER, emptySet(), 0))
+        rules.markSpoken("RIGHT", 0)   // 실제로 말한 경우에만 반복 방지가 시작된다
         assertNull(rules.onNavi(Maneuver(2, right, 300), DriveMode.BEGINNER, emptySet(), 20_000))
         assertNotNull(rules.onNavi(Maneuver(3, right, 300), DriveMode.BEGINNER, emptySet(), 60_000))
+    }
+
+    @Test fun `말하지 못한 코칭은 반복 방지에 세지 않는다`() {
+        val rules = CoachingRules()
+        assertNotNull(rules.onNavi(Maneuver(1, left, 80), DriveMode.BEGINNER, emptySet(), 0))       // 말하지 못하고 버림
+        assertNotNull(rules.onNavi(Maneuver(2, left, 300), DriveMode.BEGINNER, emptySet(), 20_000))  // 다음 좌회전은 안내
     }
 
     @Test fun `너무 가까우면 안내하지 않는다`() {

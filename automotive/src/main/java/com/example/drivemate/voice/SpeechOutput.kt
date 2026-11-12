@@ -131,9 +131,15 @@ class PleosSpeechOutput @Inject constructor(
     }
 
     // 지금 재생 중인 소리 가운데 "내비 길 안내" 용도가 있는지 본다 (안드로이드 표준 기능)
+    //
+    // [버그 수정 2026-11-12] 목록에는 "멈춰 있는(idle/stopped)" 내비 플레이어도 여러 개 남아 있어서,
+    // 예전 코드는 내비가 조용해도 "말하는 중"으로 판단해 코칭을 놓쳤다 (에뮬레이터 dumpsys audio로 확인).
+    // 안드로이드 공개 API에는 "지금 재생 중인지"를 알려주는 함수가 없어서, 설명 글자에 들어 있는
+    // "state:started"(재생 중)를 보고 판단한다. 실제 차량에서도 같은 글자가 나오는지 확인이 필요하다.
     override fun isNaviSpeaking(): Boolean = try {
         audioManager.activePlaybackConfigurations.any {
-            it.audioAttributes.usage == AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
+            it.audioAttributes.usage == AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE &&
+                it.toString().contains("state:started")
         }
     } catch (e: Exception) {
         false

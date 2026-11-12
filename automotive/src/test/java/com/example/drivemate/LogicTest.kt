@@ -141,6 +141,32 @@ class EventDetectorTest {
         assertEquals(listOf(DetectedEvent.TurnPassed(ManeuverType.LEFT, signalUsed = true, speedKmh = 36f, signalsSeen = setOf(TurnSignal.LEFT))), passed2)
     }
 
+    @Test fun `10초 안에 시속 5km 이상 변화가 방향을 바꿔 3번이면 불규칙한 속도 변화`() {
+        val d = EventDetector()
+        d.onSample(30f, null, emptySet(), 0)
+        assertTrue(d.onSample(36f, null, emptySet(), 1000).isEmpty())   // +6
+        assertTrue(d.onSample(30f, null, emptySet(), 2000).isEmpty())   // -6
+        assertEquals(listOf(DetectedEvent.IrregularSpeed(36f)), d.onSample(36f, null, emptySet(), 3000))   // +6 -> 3번째
+    }
+
+    @Test fun `같은 방향으로 천천히 가속하는 것은 불규칙이 아니다`() {
+        val d = EventDetector()
+        var speed = 0f
+        for (t in 0..12) {
+            assertTrue(d.onSample(speed, null, emptySet(), t * 1000L).none { it is DetectedEvent.IrregularSpeed })
+            speed += 5f   // 1초에 5km씩 (데모 출발 방식)
+        }
+    }
+
+    @Test fun `방향이 바뀌어도 10초가 넘게 벌어지면 세지 않는다`() {
+        val d = EventDetector()
+        d.onSample(30f, null, emptySet(), 0)
+        d.onSample(36f, null, emptySet(), 1000)                              // +6
+        for (t in 2..11) d.onSample(36f, null, emptySet(), t * 1000L)        // 10초 유지
+        d.onSample(30f, null, emptySet(), 12_000)                            // -6
+        assertTrue(d.onSample(36f, null, emptySet(), 13_000).none { it is DetectedEvent.IrregularSpeed })
+    }
+
     @Test fun `반대쪽 깜빡이만 켰으면 작동 기록으로 세지 않는다`() {
         val d = EventDetector()
         d.onSample(40f, Maneuver(1, ManeuverType.RIGHT, 80), setOf(TurnSignal.LEFT), 0)   // 우회전인데 왼쪽 깜빡이

@@ -131,10 +131,12 @@ object ReportBuilder {
     private fun otherEventsRule(events: List<EventEntity>): ReportCard? {
         val brakes = events.count { it.type == EventType.HARD_BRAKE.name && it.nearTurn != true }
         val accels = events.count { it.type == EventType.HARD_ACCEL.name && it.fromStop != true }
-        if (brakes + accels == 0) return null
+        val irregular = events.count { it.type == EventType.IRREGULAR_SPEED.name }
+        if (brakes + accels + irregular == 0) return null
         val parts = listOfNotNull(
             if (brakes > 0) "급감속 ${brakes}번" else null,
             if (accels > 0) "급가속 ${accels}번" else null,
+            if (irregular > 0) "불규칙한 속도 변화 ${irregular}번" else null,
         )
         return ReportCard(
             CardKind.OTHER_EVENTS,

@@ -364,6 +364,8 @@ class DriveSession @Inject constructor(
                             saveEvent(id, EventType.HARD_BRAKE, event.speedKmh, nearTurn = event.nearTurn)
                         is DetectedEvent.HardAccel ->
                             saveEvent(id, EventType.HARD_ACCEL, event.speedKmh, fromStop = event.fromStop)
+                        is DetectedEvent.IrregularSpeed ->
+                            saveEvent(id, EventType.IRREGULAR_SPEED, event.speedKmh)
                         is DetectedEvent.TurnPassed ->
                             saveEvent(
                                 id, EventType.TURN, event.speedKmh,

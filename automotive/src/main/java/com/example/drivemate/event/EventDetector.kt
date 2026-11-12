@@ -12,6 +12,9 @@ sealed interface DetectedEvent {
     /** 급가속. fromStop = 정차했다가 출발하는 중에 생겼는지 */
     data class HardAccel(val speedKmh: Float, val fromStop: Boolean) : DetectedEvent
 
+    /** 불규칙한 속도 변화 (팀 기준값: 10초 안에 시속 5km 이상 변화가 방향을 바꿔 가며 3번 이상) */
+    data class IrregularSpeed(val speedKmh: Float) : DetectedEvent
+
     /**
      * 회전 구간을 지나감.
      * @param signalUsed 회전 지점 앞 100m 안에서 "회전 방향과 같은 쪽" 방향지시등이 켜진 기록이 있는지
@@ -42,6 +45,9 @@ class EventDetector {
     private var lastStoppedAtMs = Long.MIN_VALUE / 2   // 마지막으로 멈춰 있던 시각
     private var inBrakeEpisode = false                 // 급감속이 이어지는 동안에는 한 번만 기록하려고 둔 표시
     private var inAccelEpisode = false
+
+    // 불규칙한 속도 변화 판단용: 최근 10초 동안 "시속 5km 이상 변한 순간"의 (시각, 방향 +1/-1)
+    private val bigChanges = ArrayDeque<Pair<Long, Int>>()
 
     // 지금 다가가고 있는 회전을 추적하는 값
     private var trackedId: Int? = null
@@ -100,6 +106,22 @@ class EventDetector {
                 } else {
                     inAccelEpisode = false
                 }
+
+                // ---------- 3) 불규칙한 속도 변화 (D항목, 팀 기준값) ----------
+                // 1초 사이 시속 5km 이상 변하면 그 방향(가속 +1 / 감속 -1)을 기억한다.
+                // 최근 10초 안에서 방향이 바뀌며 이어진 변화가 3번 이상이면 (예: 가속-감속-가속) 한 번 기록한다.
+                val delta = speedKmh - prev
+                if (kotlin.math.abs(delta) >= IRREGULAR_STEP_KMH) {
+                    val dir = if (delta > 0) 1 else -1
+                    // 같은 방향이 이어지면(계속 가속 중) 새로 세지 않고 마지막 시각만 갱신
+                    if (bigChanges.lastOrNull()?.second == dir) bigChanges.removeLast()
+                    bigChanges.addLast(nowMs to dir)
+                }
+                while (bigChanges.isNotEmpty() && nowMs - bigChanges.first().first > IRREGULAR_WINDOW_MS) bigChanges.removeFirst()
+                if (bigChanges.size >= IRREGULAR_MIN_CHANGES) {
+                    events += DetectedEvent.IrregularSpeed(speedKmh)
+                    bigChanges.clear()   // 한 번 기록하면 처음부터 다시 센다 (같은 구간을 여러 번 세지 않게)
+                }
             }
         }
         prevSpeed = speedKmh
@@ -112,6 +134,7 @@ class EventDetector {
         prevSpeed = null
         inBrakeEpisode = false
         inAccelEpisode = false
+        bigChanges.clear()
         trackedId = null
         cameWithinRange = false
         signalsSeen.clear()
@@ -125,5 +148,10 @@ class EventDetector {
         const val NEAR_TURN_M = 100              // "회전 지점 앞 100m" (팀 기준값)
         const val STOPPED_KMH = 3f               // 이보다 느리면 멈춘 것으로 본다
         const val FROM_STOP_WINDOW_MS = 5_000L   // 멈춘 뒤 5초 안의 급가속은 "출발할 때"로 본다
+
+        // 불규칙한 속도 변화: 공인 기준을 찾지 못해 정한 "팀 기준값, 테스트 후 조정" (2026-11-13)
+        const val IRREGULAR_STEP_KMH = 5f        // 1초 사이 이만큼 이상 변하면 "큰 변화"
+        const val IRREGULAR_WINDOW_MS = 10_000L  // 이 시간 안에서
+        const val IRREGULAR_MIN_CHANGES = 3      // 방향이 바뀌며 이어진 큰 변화가 이 횟수 이상이면 기록
     }
 }

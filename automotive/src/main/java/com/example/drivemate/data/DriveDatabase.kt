@@ -25,6 +25,10 @@ interface DriveDao {
     @Query("SELECT * FROM trip WHERE id = :id")
     suspend fun getTrip(id: Long): TripEntity?
 
+    /** 이 주행 바로 전에 끝난 주행 (이전 주행 대비 변화용) */
+    @Query("SELECT * FROM trip WHERE endTime IS NOT NULL AND startTime < :startTime ORDER BY startTime DESC LIMIT 1")
+    suspend fun getPreviousTrip(startTime: Long): TripEntity?
+
     @Query("SELECT id FROM trip WHERE endTime IS NOT NULL ORDER BY startTime DESC LIMIT 1")
     suspend fun latestFinishedTripId(): Long?
 

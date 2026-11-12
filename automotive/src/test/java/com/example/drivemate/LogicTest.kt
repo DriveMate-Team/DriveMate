@@ -18,6 +18,8 @@ import com.example.drivemate.model.Topic
 import com.example.drivemate.model.TurnSignal
 import com.example.drivemate.report.CardKind
 import com.example.drivemate.report.ReportBuilder
+import com.example.drivemate.report.TripComparison
+import com.example.drivemate.report.Trend
 import com.example.drivemate.ui.theme.DarkColors
 import com.example.drivemate.ui.theme.DmColors
 import com.example.drivemate.ui.theme.LightColors
@@ -190,6 +192,17 @@ class ReportBuilderTest {
         val report = ReportBuilder.build(listOf(brake(false)), emptyList())
         assertEquals(CardKind.OTHER_EVENTS, report.cards.single().kind)
         assertEquals("주행 중 급감속 1번이 기록됐어요", report.cards.single().fact)
+    }
+
+    @Test fun `이전 주행과 비교 - 줄면 칭찬, 늘면 사실만, 둘 다 0이면 뺀다`() {
+        val prev = listOf(turn("RIGHT", false), turn("RIGHT", false), turn("RIGHT", false), brake(true))
+        val now = listOf(turn("RIGHT", false), brake(true), accel(true))
+        val rows = TripComparison.compare(prev, now)
+        assertEquals(listOf("깜빡이 기록 없음", "급감속", "급가속"), rows.map { it.label })   // 불규칙 속도는 둘 다 0이라 빠짐
+        assertEquals("지난번보다 2번 줄었어요", rows[0].text)
+        assertEquals(Trend.FEWER, rows[0].trend)
+        assertEquals("지난번과 같아요", rows[1].text)
+        assertEquals("지난번보다 1번 많았어요", rows[2].text)
     }
 
     @Test fun `조사는 받침에 따라 고른다`() {

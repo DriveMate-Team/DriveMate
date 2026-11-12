@@ -44,6 +44,9 @@ import com.example.drivemate.report.CardKind
 import com.example.drivemate.report.Goal
 import com.example.drivemate.report.ReportBuilder
 import com.example.drivemate.report.ReportCard
+import com.example.drivemate.report.CompareRow
+import com.example.drivemate.report.Trend
+import com.example.drivemate.report.TripComparison
 import com.example.drivemate.ui.components.DmButton
 import com.example.drivemate.ui.components.DmCard
 import com.example.drivemate.ui.components.DmChoice
@@ -72,6 +75,8 @@ data class ReportUi(
     val cards: List<ReportCard> = emptyList(),
     val goal: Goal? = null,
     val events: List<EventRow> = emptyList(),
+    val compare: List<CompareRow> = emptyList(),   // 이전 주행 대비 변화 (이전 주행이 없으면 빈 목록)
+    val hasPrevious: Boolean = false,
 )
 
 /** 리포트 화면의 ViewModel: 주행 하나의 기록을 읽어 처방 카드·다음 목표·이벤트 목록으로 바꾼다 */
@@ -94,7 +99,12 @@ class ReportViewModel @Inject constructor(
         combine(repo.observeTrip(tripId), repo.observeEvents(tripId), repo.observeQuestions(tripId)) { trip, events, questions ->
             if (trip == null) return@combine ReportUi()
             val report = ReportBuilder.build(events, questions)
+            // 이전 주행 대비 변화 (신청서 3-④)
+            val previous = repo.getPreviousTrip(trip.startTime)
+            val compare = previous?.let { TripComparison.compare(repo.getEvents(it.id), events) }.orEmpty()
             ReportUi(
+                compare = compare,
+                hasPrevious = previous != null,
                 loaded = true,
                 header = listOf(
                     trip.destination ?: "목적지 없음",
@@ -125,6 +135,7 @@ class ReportViewModel @Inject constructor(
             }
             EventType.HARD_BRAKE.name -> if (nearTurn == true) "급감속 · 회전·교차로 앞" else "급감속"
             EventType.HARD_ACCEL.name -> if (fromStop == true) "급가속 · 출발할 때" else "급가속"
+            EventType.IRREGULAR_SPEED.name -> "불규칙한 속도 변화"
             else -> "어려웠던 곳으로 표시"
         }
         return EventRow(id, formatTime(time), label, "${speedKmh.toInt()}km/h", difficult)
@@ -159,6 +170,7 @@ fun ReportScreen(onHome: () -> Unit, viewModel: ReportViewModel = hiltViewModel(
                 Row(horizontalArrangement = Arrangement.spacedBy(DmDimens.gap)) {
                     Column(Modifier.weight(1.7f), verticalArrangement = Arrangement.spacedBy(DmDimens.gap)) {
                         ui.cards.forEach { PrescriptionCard(it) }
+                        if (ui.hasPrevious) CompareCard(ui.compare)
                         EventList(ui.events, viewModel::toggleDifficult)
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DmDimens.gap)) {
@@ -169,6 +181,7 @@ fun ReportScreen(onHome: () -> Unit, viewModel: ReportViewModel = hiltViewModel(
             } else {
                 // 좁은 창(세로): 위에서 아래로 쌓는다
                 ui.cards.forEach { PrescriptionCard(it) }
+                if (ui.hasPrevious) CompareCard(ui.compare)
                 GoalCard(ui.goal, onHome, Modifier.fillMaxWidth())
                 AskCard(drive, viewModel::onMic, Modifier.fillMaxWidth())
                 EventList(ui.events, viewModel::toggleDifficult)
@@ -205,6 +218,28 @@ private fun GoalCard(goal: Goal?, onHome: () -> Unit, modifier: Modifier) {
         Text(goal?.title ?: "", style = DmType.title, color = colors.accentText)
         Text(goal?.detail ?: "", style = DmType.body, color = colors.text)
         DmButton("홈으로", onHome, Modifier.fillMaxWidth().padding(top = 16.dp).height(120.dp))
+    }
+}
+
+/** 이전 주행 대비 변화: 줄었으면 초록 칭찬, 그 밖에는 사실만 (빨간색 없음) */
+@Composable
+private fun CompareCard(rows: List<CompareRow>) {
+    val colors = DmTheme.colors
+    DmCard(Modifier.fillMaxWidth()) {
+        Text("지난 주행과 비교", style = DmType.sub, color = colors.textSub)
+        if (rows.isEmpty()) {
+            Text("두 주행 모두 기록된 급가속·급감속·깜빡이 누락이 없어요", style = DmType.body, color = colors.text)
+        }
+        rows.forEach { row ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                DmDot(if (row.trend == Trend.FEWER) colors.good else colors.outline)
+                Text("${row.label} ${row.before} → ${row.now}", style = DmType.body, color = colors.text, modifier = Modifier.weight(1f))
+                Text(
+                    row.text, style = DmType.body,
+                    color = if (row.trend == Trend.FEWER) colors.goodText else colors.textSub,
+                )
+            }
+        }
     }
 }
 

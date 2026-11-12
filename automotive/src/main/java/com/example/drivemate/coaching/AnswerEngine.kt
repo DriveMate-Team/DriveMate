@@ -17,7 +17,10 @@ data class Answer(val topic: String?, val text: String)
  * 2차에 Gleo AI나 LLM SDK로 바꿀 때는 이 통로를 구현한 새 클래스로 갈아 끼우면 된다. (설계문서 1단계 결정 사항)
  */
 interface AnswerEngine {
-    fun answer(question: String, topics: Set<Topic>): Answer
+    /**
+     * @param trip 지금 주행(또는 방금 끝난 주행)의 기록. 기록 기반 질문("아까 깜빡이 켰어?")에 쓴다. 없으면 null
+     */
+    fun answer(question: String, topics: Set<Topic>, trip: TripContext? = null): Answer
 }
 
 /**
@@ -53,8 +56,14 @@ class KeywordAnswerEngine : AnswerEngine {
         ),
     )
 
-    override fun answer(question: String, topics: Set<Topic>): Answer {
+    override fun answer(question: String, topics: Set<Topic>, trip: TripContext?): Answer {
         val q = question.replace(" ", "")   // 띄어쓰기는 음성 인식마다 달라서 없애고 비교한다
+
+        // 1) 주행 기록에 대한 질문을 먼저 본다. ("우회전할 때 깜빡이 켰어?"는 "우회전" 일반 질문보다 먼저 걸러야 한다)
+        //    기록 질문은 "질문한 주제"로 세지 않는다 (topic = null)
+        RecordAnswers.answer(q, trip)?.let { return Answer(null, it) }
+
+        // 2) 일반 운전 질문 (미리 쓴 답변)
         entries.firstOrNull { e -> e.keywords.any { it in q } }?.let { return Answer(it.topic, it.answer) }
 
         // "오늘 뭐 연습해?" -> 주행 준비에서 고른 주제를 넣어 답한다 (리포트의 질문 주제로는 세지 않는다)

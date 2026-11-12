@@ -4,6 +4,7 @@ import android.util.Log
 import com.example.drivemate.coaching.AnswerEngine
 import com.example.drivemate.coaching.Coaching
 import com.example.drivemate.coaching.CoachingRules
+import com.example.drivemate.coaching.TripContext
 import com.example.drivemate.data.DriveRepository
 import com.example.drivemate.data.EventEntity
 import com.example.drivemate.data.QuestionEntity
@@ -187,13 +188,17 @@ class DriveSession @Inject constructor(
         }
     }
 
-    /** 마이크 버튼: 듣기 시작 (듣는 중에 다시 누르면 취소) */
-    fun onMicPressed() {
-        if (!_state.value.active) return
+    /**
+     * 마이크 버튼: 듣기 시작 (듣는 중에 다시 누르면 취소)
+     * 주행 중(주행 화면)과 주차 후(리포트 화면) 모두 쓸 수 있다. (신청서 4-⑤: 주차 후 AI에게 질문)
+     * @param reportTripId 주차 후 리포트 화면에서 누른 경우, 그 리포트의 주행 번호 (질문을 그 주행 기록으로 답한다)
+     */
+    fun onMicPressed(reportTripId: Long? = null) {
+        questionTripId = if (_state.value.active) null else reportTripId
         when (_state.value.listen) {
             ListenState.LISTENING -> {
                 speechIn.cancel()
-                _state.update { it.copy(listen = ListenState.IDLE, bubble = defaultBubble(it.hasRoute)) }
+                _state.update { it.copy(listen = ListenState.IDLE, bubble = if (it.active) defaultBubble(it.hasRoute) else "") }
             }
             ListenState.ANSWERING -> Unit   // 답하는 중에는 무시
             ListenState.IDLE -> {
@@ -213,32 +218,53 @@ class DriveSession @Inject constructor(
         }
     }
 
+    // 주차 후 질문이 어느 주행에 대한 것인지 (리포트 화면에서 넘겨받음). 주행 중이면 null
+    private var questionTripId: Long? = null
+
     /** 인식된 질문 문장을 처리한다 (마이크로 들은 문장, 또는 테스트에서 직접 넣은 문장) */
     fun onQuestionText(text: String) {
-        val id = tripId ?: return
+        val live = _state.value.active
+        scope.launch {
+            // 답할 때 쓸 주행: 주행 중이면 지금 주행, 아니면 리포트의 주행 또는 가장 최근에 끝난 주행
+            val id = if (live) tripId else (questionTripId ?: repo.latestFinishedTripId())
+            val ctx = id?.let { TripContext(repo.getEvents(it), repo.getQuestions(it), live) }
+            answerQuestion(text, id, ctx, live)
+        }
+    }
+
+    private fun answerQuestion(text: String, id: Long?, ctx: TripContext?, live: Boolean) {
         val now = System.currentTimeMillis()
         val reply: String
         val bubble: String
 
-        if ("어려웠" in text || "어려워" in text) {
+        if (!live && ("어려웠" in text || "어려워" in text)) {
+            // 주차 후에는 위치를 모르므로 리포트 목록에서 직접 체크하도록 안내한다
+            reply = "리포트의 이벤트 목록에서 어려웠던 곳을 체크해 주세요."
+            bubble = reply
+        } else if (id != null && ("어려웠" in text || "어려워" in text)) {
             // "어려웠어" -> 지금 위치를 어려웠던 구간으로 표시한다 (설계문서 5단계)
             saveEvent(id, EventType.DIFFICULT, vehicle.state.value.speedKmh, difficult = true)
             reply = "여기를 어려웠던 구간으로 표시했어요."
             bubble = reply
         } else {
-            val answer = answerEngine.answer(text, _state.value.topics)
-            scope.launch {
+            val answer = answerEngine.answer(text, _state.value.topics, ctx)
+            if (id != null) scope.launch {
                 repo.addQuestion(QuestionEntity(tripId = id, time = now, question = text, answer = answer.text, topic = answer.topic))
             }
             reply = answer.text
-            // 주행 중 화면에는 긴 답을 글자로 띄우지 않는다 (답은 음성으로). 짧은 답은 그대로 보여준다.
-            bubble = if (answer.topic != null) "${answer.topic} 질문에 답하고 있어요." else answer.text
+            // 주행 중 화면에는 긴 답을 글자로 띄우지 않는다 (답은 음성으로). 주차 후에는 답을 글자로도 보여준다.
+            bubble = when {
+                !live -> answer.text
+                answer.topic != null -> "${answer.topic} 질문에 답하고 있어요."
+                answer.text.length > 40 -> "기록을 보고 답하고 있어요."
+                else -> answer.text
+            }
         }
         Log.i(TAG, "QUESTION: $text -> $reply")
         bubbleManeuverId = null
         _state.update { it.copy(listen = ListenState.ANSWERING, bubble = bubble) }
         val spoke = speechOut.speak(reply) {
-            _state.update { if (it.active) it.copy(listen = ListenState.IDLE) else it }
+            _state.update { it.copy(listen = ListenState.IDLE) }
         }
         if (!spoke) {
             // 음성을 낼 수 없으면(준비 안 됨 등) 답을 글자로라도 보여준다

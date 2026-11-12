@@ -23,6 +23,22 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.example.drivemate.data.DriveRepository
 import com.example.drivemate.data.EventEntity
+import com.example.drivemate.drive.DriveSession
+import com.example.drivemate.drive.DriveState
+import com.example.drivemate.drive.ListenState
+import com.example.drivemate.ui.components.MicIcon
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.semantics.Role
 import com.example.drivemate.model.EventType
 import com.example.drivemate.report.CardKind
 import com.example.drivemate.report.Goal
@@ -62,10 +78,17 @@ data class ReportUi(
 @HiltViewModel
 class ReportViewModel @Inject constructor(
     private val repo: DriveRepository,
+    private val session: DriveSession,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val tripId: Long = savedStateHandle["tripId"] ?: 0L
+
+    /** 마이크·답변 상태 (주행 중 화면과 같은 두뇌를 쓴다) */
+    val drive: StateFlow<DriveState> = session.state
+
+    /** 주차 후 질문: 이 리포트의 주행 기록으로 답한다 (신청서 4-⑤) */
+    fun onMic() = session.onMicPressed(reportTripId = tripId)
 
     val ui: StateFlow<ReportUi> =
         combine(repo.observeTrip(tripId), repo.observeEvents(tripId), repo.observeQuestions(tripId)) { trip, events, questions ->
@@ -117,6 +140,7 @@ class ReportViewModel @Inject constructor(
 @Composable
 fun ReportScreen(onHome: () -> Unit, viewModel: ReportViewModel = hiltViewModel()) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
+    val drive by viewModel.drive.collectAsStateWithLifecycle()
     val colors = DmTheme.colors
 
     BoxWithConstraints(Modifier.fillMaxSize().padding(DmDimens.screenPadding)) {
@@ -137,12 +161,16 @@ fun ReportScreen(onHome: () -> Unit, viewModel: ReportViewModel = hiltViewModel(
                         ui.cards.forEach { PrescriptionCard(it) }
                         EventList(ui.events, viewModel::toggleDifficult)
                     }
-                    GoalCard(ui.goal, onHome, Modifier.weight(1f))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DmDimens.gap)) {
+                        GoalCard(ui.goal, onHome, Modifier.fillMaxWidth())
+                        AskCard(drive, viewModel::onMic, Modifier.fillMaxWidth())
+                    }
                 }
             } else {
                 // 좁은 창(세로): 위에서 아래로 쌓는다
                 ui.cards.forEach { PrescriptionCard(it) }
                 GoalCard(ui.goal, onHome, Modifier.fillMaxWidth())
+                AskCard(drive, viewModel::onMic, Modifier.fillMaxWidth())
                 EventList(ui.events, viewModel::toggleDifficult)
             }
         }
@@ -177,6 +205,48 @@ private fun GoalCard(goal: Goal?, onHome: () -> Unit, modifier: Modifier) {
         Text(goal?.title ?: "", style = DmType.title, color = colors.accentText)
         Text(goal?.detail ?: "", style = DmType.body, color = colors.text)
         DmButton("홈으로", onHome, Modifier.fillMaxWidth().padding(top = 16.dp).height(120.dp))
+    }
+}
+
+/**
+ * 주차 후 질문 카드: 마이크 버튼 + 상태 + 답변 글자.
+ * 예: "아까 우회전할 때 깜빡이 켰어?", "오늘 부족했던 점은?", "더 연습하면 좋을 부분은?" (신청서 4-⑤)
+ * 정차 중 화면이라 답을 글자로도 보여준다.
+ */
+@Composable
+private fun AskCard(drive: DriveState, onMic: () -> Unit, modifier: Modifier) {
+    val colors = DmTheme.colors
+    val listening = drive.listen == ListenState.LISTENING
+    DmCard(modifier) {
+        Text("이번 주행에 대해 물어보기", style = DmType.sub, color = colors.textSub)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Box(
+                Modifier
+                    .size(DmDimens.buttonMin)
+                    .clip(CircleShape)
+                    .background(if (listening) colors.card else colors.accentFill)
+                    .then(if (listening) Modifier.border(BorderStroke(5.dp, colors.accent), CircleShape) else Modifier)
+                    .clickable(role = Role.Button, onClickLabel = "질문하기") { onMic() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    rememberVectorPainter(MicIcon), contentDescription = "질문하기", modifier = Modifier.size(48.dp),
+                    colorFilter = ColorFilter.tint(if (listening) colors.accentText else colors.onAccentFill),
+                )
+            }
+            Text(
+                when (drive.listen) {
+                    ListenState.LISTENING -> "듣고 있어요"
+                    ListenState.ANSWERING -> "답하는 중"
+                    ListenState.IDLE -> "예: 아까 우회전할 때 깜빡이 켰어?"
+                },
+                style = DmType.body, color = if (listening) colors.accentText else colors.text,
+            )
+        }
+        // 마지막 답변 (기본 안내 문구는 보여주지 않는다)
+        if (drive.bubble.isNotBlank() && !drive.active && drive.listen != ListenState.LISTENING) {
+            Text(drive.bubble, style = DmType.body, color = colors.text)
+        }
     }
 }
 

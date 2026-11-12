@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import com.example.drivemate.coaching.CoachingRules
 import com.example.drivemate.coaching.KeywordAnswerEngine
+import com.example.drivemate.coaching.RecordAnswers
+import com.example.drivemate.coaching.TripContext
 import com.example.drivemate.data.EventEntity
 import com.example.drivemate.data.QuestionEntity
 import com.example.drivemate.event.DetectedEvent
@@ -217,6 +219,50 @@ class AnswerEngineTest {
 
     @Test fun `그 정도만 있고 좌회전이 없으면 비보호 답을 주지 않는다`() {
         assertEquals(null, engine.answer("그 정도면 괜찮아", emptySet()).topic)
+    }
+
+    // ---------- 주행 기록 기반 질문 (신청서 3-③, 4-⑤) ----------
+    private fun turn(direction: String, used: Boolean, side: String, time: Long) = EventEntity(
+        tripId = 1, time = time, type = EventType.TURN.name, speedKmh = 30f, turnSignal = "OFF", brake = false,
+        direction = direction, signalUsed = used, signalSide = side,
+    )
+    private fun ctx(vararg events: EventEntity, questions: List<QuestionEntity> = emptyList()) =
+        TripContext(events.toList(), questions, live = false)
+
+    @Test fun `우회전 깜빡이 질문 - 작동 기록이 있으면 사실과 판단 불가를 함께 말한다`() {
+        val a = engine.answer("아까 우회전할 때 깜빡이 켰어", emptySet(), ctx(turn("RIGHT", true, "RIGHT", 10)))
+        assertEquals(null, a.topic)   // 기록 질문은 "질문 주제"로 세지 않는다
+        assertEquals("가장 최근 우회전 구간에서 오른쪽 방향지시등이 작동한 기록이 있어요. ${RecordAnswers.CANNOT_JUDGE}", a.text)
+    }
+
+    @Test fun `우회전 깜빡이 질문 - 가장 최근 우회전을 고르고 반대쪽이면 그렇게 말한다`() {
+        val a = engine.answer("우회전 깜빡이 켰어?", emptySet(), ctx(
+            turn("RIGHT", true, "RIGHT", 10), turn("LEFT", false, "", 20), turn("RIGHT", false, "LEFT", 30),
+        ))
+        assertTrue(a.text.startsWith("가장 최근 우회전 구간에서는 반대쪽 방향지시등 기록만 있어요."))
+    }
+
+    @Test fun `깜빡이 질문 - 기록이 없으면 없다고 말한다`() {
+        assertEquals("이번 주행에는 우회전 기록이 없어요.", engine.answer("우회전할 때 깜빡이 켰어", emptySet(), ctx()).text)
+        assertTrue(engine.answer("깜빡이 켰어", emptySet(), null).text.startsWith("아직 주행 기록이 없어요"))
+    }
+
+    @Test fun `부족했던 점 질문 - 리포트 첫 카드의 사실 + 판단 불가`() {
+        val a = engine.answer("오늘 부족했던 점은 뭐야", emptySet(), ctx(turn("RIGHT", false, "", 10), turn("RIGHT", false, "", 20)))
+        assertEquals("이번 주행에서 우회전 2번 중 2번은 깜빡이 기록이 없었어요. ${RecordAnswers.CANNOT_JUDGE}", a.text)
+    }
+
+    @Test fun `더 연습할 부분 질문 - 다음 목표와 질문 주제, 어려웠던 곳을 함께 말한다`() {
+        val difficult = EventEntity(tripId = 1, time = 5, type = EventType.DIFFICULT.name, speedKmh = 20f, turnSignal = "OFF", brake = false, difficult = true)
+        val q = QuestionEntity(tripId = 1, time = 6, question = "비보호", answer = "", topic = "비보호 좌회전")
+        val a = engine.answer("오늘 내가 어떤 부분을 더 연습하면 좋을까", emptySet(), ctx(
+            turn("RIGHT", false, "", 10), turn("RIGHT", false, "", 20), difficult, questions = listOf(q),
+        ))
+        assertEquals("다음엔 우회전 전 깜빡이 미리 켜기를 연습해 봐요. 오늘 물어본 비보호 좌회전도 함께 연습하면 좋아요. 어려웠다고 표시한 곳도 1곳 있어요.", a.text)
+    }
+
+    @Test fun `기록 질문이 아니면 기존 답변을 그대로 쓴다`() {
+        assertEquals("우회전", engine.answer("우회전 할 때 멈춰야 해", emptySet(), ctx()).topic)
     }
 
     @Test fun `목록에 없는 질문은 정차 후 다시 물어봐 달라고 한다`() {

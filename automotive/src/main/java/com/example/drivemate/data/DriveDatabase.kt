@@ -25,6 +25,9 @@ interface DriveDao {
     @Query("SELECT * FROM trip WHERE id = :id")
     suspend fun getTrip(id: Long): TripEntity?
 
+    @Query("SELECT id FROM trip WHERE endTime IS NOT NULL ORDER BY startTime DESC LIMIT 1")
+    suspend fun latestFinishedTripId(): Long?
+
     @Query("SELECT * FROM trip WHERE id = :id")
     fun observeTrip(id: Long): Flow<TripEntity?>
 

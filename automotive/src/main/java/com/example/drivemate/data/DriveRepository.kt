@@ -16,6 +16,7 @@ class DriveRepository @Inject constructor(private val dao: DriveDao) {
     suspend fun startTrip(trip: TripEntity): Long = dao.insertTrip(trip)
     suspend fun updateTrip(trip: TripEntity) = dao.updateTrip(trip)
     suspend fun getTrip(id: Long): TripEntity? = dao.getTrip(id)
+    suspend fun latestFinishedTripId(): Long? = dao.latestFinishedTripId()
     fun observeTrip(id: Long): Flow<TripEntity?> = dao.observeTrip(id)
     fun observeFinishedTrips(): Flow<List<TripEntity>> = dao.observeFinishedTrips()
 

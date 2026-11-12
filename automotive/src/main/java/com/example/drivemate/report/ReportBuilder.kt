@@ -98,7 +98,7 @@ object ReportBuilder {
             card = ReportCard(
                 CardKind.SIGNAL,
                 fact,
-                "내비가 300m를 알려주면 바로 켜 보세요",
+                "회전 지점 30미터 전에는 꼭 켜 두세요",
             ),
             count = missed,
             goal = Goal("$name 전 깜빡이 미리 켜기", "오늘 ${total}번 중 ${missed}번 기록 없음"),

@@ -198,7 +198,7 @@ class ReportBuilderTest {
     @Test fun `깜빡이 기록 없음 2번이면 카드와 다음 목표가 된다`() {
         val report = ReportBuilder.build(listOf(turn("RIGHT", false), turn("RIGHT", false), turn("RIGHT", true)), emptyList())
         assertEquals("우회전 3번 중 2번은 깜빡이 기록이 없었어요", report.cards[0].fact)
-        assertEquals("내비가 300m를 알려주면 바로 켜 보세요", report.cards[0].tip)
+        assertEquals("회전 지점 30미터 전에는 꼭 켜 두세요", report.cards[0].tip)
         assertEquals("우회전 전 깜빡이 미리 켜기", report.goal.title)
         assertEquals("오늘 3번 중 2번 기록 없음", report.goal.detail)
     }

@@ -200,6 +200,14 @@ class AnswerEngineTest {
         )
     }
 
+    @Test fun `비보호를 잘못 알아들은 실제 인식 결과도 비보호 답을 준다`() {
+        assertEquals("비보호 좌회전", engine.answer("그 정도 좌회전은 언제 해", emptySet()).topic)
+    }
+
+    @Test fun `그 정도만 있고 좌회전이 없으면 비보호 답을 주지 않는다`() {
+        assertEquals(null, engine.answer("그 정도면 괜찮아", emptySet()).topic)
+    }
+
     @Test fun `목록에 없는 질문은 정차 후 다시 물어봐 달라고 한다`() {
         assertEquals("그 질문은 정차 후 다시 물어봐 주세요.", engine.answer("오늘 날씨 어때", emptySet()).text)
     }

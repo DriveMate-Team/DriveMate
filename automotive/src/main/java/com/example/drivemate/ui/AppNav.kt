@@ -5,7 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
+import android.util.Log
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.navigation.NavController
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,6 +59,21 @@ class AppViewModel @Inject constructor(val session: DriveSession) : ViewModel()
 fun AppNav(viewModel: AppViewModel = hiltViewModel()) {
     val nav = rememberNavController()
     val drive by viewModel.session.state.collectAsStateWithLifecycle()
+
+    // [조사용 로그] 화면이 바뀔 때마다 "지금 화면"과 "쌓인 화면 목록"을 남긴다 (빈 화면 버그 추적)
+    DisposableEffect(nav) {
+        val listener = NavController.OnDestinationChangedListener { controller, destination, _ ->
+            val stack = controller.currentBackStack.value.mapNotNull { it.destination.route }
+            Log.i("DriveMate", "SCREEN ${destination.route} stack=$stack")
+        }
+        nav.addOnDestinationChangedListener(listener)
+        onDispose { nav.removeOnDestinationChangedListener(listener) }
+    }
+    // [조사용 로그] 창 크기가 바뀔 때 (화면 분할 <-> 전체 화면)
+    val config = LocalConfiguration.current
+    LaunchedEffect(config.screenWidthDp, config.screenHeightDp) {
+        Log.i("DriveMate", "WINDOW ${config.screenWidthDp}x${config.screenHeightDp}dp route=${nav.currentDestination?.route}")
+    }
 
     // 주행 시작 -> 주행 중 화면으로
     LaunchedEffect(drive.active) {

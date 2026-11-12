@@ -96,7 +96,7 @@ class ReportViewModel @Inject constructor(
                 val direction = if (direction == "LEFT") "좌회전" else "우회전"
                 if (signalUsed == true) "$direction · 방향지시등 작동 기록 있음" else "$direction · 방향지시등 기록 없음"
             }
-            EventType.HARD_BRAKE.name -> if (nearTurn == true) "급감속 · 교차로 앞" else "급감속"
+            EventType.HARD_BRAKE.name -> if (nearTurn == true) "급감속 · 회전·교차로 앞" else "급감속"
             EventType.HARD_ACCEL.name -> if (fromStop == true) "급가속 · 출발할 때" else "급가속"
             else -> "어려웠던 곳으로 표시"
         }

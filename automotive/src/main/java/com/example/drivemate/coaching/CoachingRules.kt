@@ -20,43 +20,31 @@ data class Coaching(val key: String, val speech: String, val bubble: String)
  */
 class CoachingRules {
 
-    private val announced = mutableSetOf<Int>()            // 이미 안내한 상황 번호 (같은 회전을 두 번 말하지 않기)
-    private val lastSpokenAt = mutableMapOf<String, Long>() // 종류별 마지막 안내 시각 (짧은 시간에 반복하지 않기)
+    // 이미 안내한 회전 지점 번호. "같은 안내를 반복하지 않기"는 같은 회전 지점에만 적용한다.
+    // (2026-11-12 결정: 예전에는 "좌회전 안내"라는 종류 단위로 30초 동안 막아서, 25초 뒤의 다른 좌회전을 놓쳤다)
+    private val announced = mutableSetOf<Int>()
 
     /**
      * 내비의 "다음 상황"이 새로 들어올 때마다 부른다. 지금 말할 코칭이 있으면 돌려주고, 없으면 null.
      *
-     * @param nowMs 지금 시각(ms). 테스트에서 시간을 마음대로 넣을 수 있게 밖에서 받는다
+     * @param nowMs 지금 시각(ms). 지금 규칙에서는 쓰지 않지만, 시간 기준 규칙을 다시 넣을 때를 위해 남겨 둔다
      */
+    @Suppress("UNUSED_PARAMETER")
     fun onNavi(next: Maneuver?, mode: DriveMode, topics: Set<Topic>, nowMs: Long): Coaching? {
         if (next == null) return null
-        if (next.id in announced) return null                       // 이 회전은 이미 안내함
+        if (next.id in announced) return null                       // 이 회전 지점은 이미 안내함
         if (next.distanceM > announceDistance(next.type)) return null   // 아직 멀다
         if (next.distanceM < TOO_LATE_M) return null                // 너무 가까우면 말하지 않는다 (회전 중에 말 걸지 않기)
         if (!isWanted(next.type, mode, topics)) return null
 
         val coaching = messageFor(next.type) ?: return null
-        val last = lastSpokenAt[coaching.key]
-        if (last != null && nowMs - last < REPEAT_COOLDOWN_MS) {    // 같은 안내를 방금 했으면 이번 회전은 조용히 넘어간다
-            announced.add(next.id)
-            return null
-        }
         announced.add(next.id)
-        return coaching   // 반복 방지 시각은 실제로 말했을 때 markSpoken()으로 기록한다
-    }
-
-    /**
-     * 코칭을 실제로 말했을 때 부른다. 이때부터 같은 안내를 REPEAT_COOLDOWN_MS 동안 반복하지 않는다.
-     * (말하지 못하고 버린 코칭까지 세면, 다음 회전의 안내를 놓친다. 에뮬레이터 실제 경로에서 확인)
-     */
-    fun markSpoken(key: String, nowMs: Long) {
-        lastSpokenAt[key] = nowMs
+        return coaching
     }
 
     /** 새 주행을 시작할 때 기억을 지운다 */
     fun reset() {
         announced.clear()
-        lastSpokenAt.clear()
     }
 
     // 이 상황을 안내할지: 초보 모드는 좌·우회전을 항상, 일반 모드는 고른 연습 주제만. 교차로는 주제로 골랐을 때만.
@@ -71,7 +59,6 @@ class CoachingRules {
         const val TURN_ANNOUNCE_M = 300          // 좌회전·우회전: 300m 전에 안내
         const val INTERSECTION_ANNOUNCE_M = 200  // 교차로: 200m 전에 안내
         const val TOO_LATE_M = 50                // 이보다 가까우면 안내하지 않음
-        const val REPEAT_COOLDOWN_MS = 30_000L   // 같은 안내는 30초 안에 반복하지 않음
 
         fun announceDistance(type: ManeuverType): Int =
             if (type == ManeuverType.INTERSECTION) INTERSECTION_ANNOUNCE_M else TURN_ANNOUNCE_M

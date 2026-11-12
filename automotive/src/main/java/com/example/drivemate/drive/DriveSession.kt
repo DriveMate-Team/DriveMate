@@ -304,7 +304,6 @@ class DriveSession @Inject constructor(
         if (_state.value.listen != ListenState.IDLE) return   // 질문을 듣거나 답하는 중
         if (speechOut.isNaviSpeaking()) return                // 내비 안내가 끝난 뒤에 말한다
         if (speechOut.speak(coaching.speech)) {
-            rules.markSpoken(coaching.key, System.currentTimeMillis())
             pending = null
             bubbleManeuverId = pendingManeuverId
             _state.update { it.copy(bubble = coaching.bubble) }

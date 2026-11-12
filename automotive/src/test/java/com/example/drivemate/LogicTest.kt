@@ -60,18 +60,16 @@ class CoachingRulesTest {
         assertNotNull(CoachingRules().onNavi(Maneuver(1, right, 300), DriveMode.NORMAL, setOf(Topic.RIGHT_TURN), 0))
     }
 
-    @Test fun `같은 안내를 30초 안에 반복하지 않는다`() {
+    @Test fun `같은 회전 지점은 다시 안내하지 않는다`() {
         val rules = CoachingRules()
         assertNotNull(rules.onNavi(Maneuver(1, right, 300), DriveMode.BEGINNER, emptySet(), 0))
-        rules.markSpoken("RIGHT", 0)   // 실제로 말한 경우에만 반복 방지가 시작된다
-        assertNull(rules.onNavi(Maneuver(2, right, 300), DriveMode.BEGINNER, emptySet(), 20_000))
-        assertNotNull(rules.onNavi(Maneuver(3, right, 300), DriveMode.BEGINNER, emptySet(), 60_000))
+        assertNull(rules.onNavi(Maneuver(1, right, 200), DriveMode.BEGINNER, emptySet(), 60_000))
     }
 
-    @Test fun `말하지 못한 코칭은 반복 방지에 세지 않는다`() {
+    @Test fun `다른 회전 지점은 방금 같은 안내를 했어도 안내한다`() {
         val rules = CoachingRules()
-        assertNotNull(rules.onNavi(Maneuver(1, left, 80), DriveMode.BEGINNER, emptySet(), 0))       // 말하지 못하고 버림
-        assertNotNull(rules.onNavi(Maneuver(2, left, 300), DriveMode.BEGINNER, emptySet(), 20_000))  // 다음 좌회전은 안내
+        assertNotNull(rules.onNavi(Maneuver(1, left, 80), DriveMode.BEGINNER, emptySet(), 0))
+        assertNotNull(rules.onNavi(Maneuver(2, left, 300), DriveMode.BEGINNER, emptySet(), 5_000))  // 5초 뒤 다른 좌회전
     }
 
     @Test fun `너무 가까우면 안내하지 않는다`() {
@@ -153,7 +151,8 @@ class ReportBuilderTest {
         val events = listOf(turn("RIGHT", false), turn("RIGHT", false), brake(true), brake(true), brake(true), accel(true))
         val report = ReportBuilder.build(events, emptyList())
         assertEquals(listOf(CardKind.SIGNAL, CardKind.BRAKE, CardKind.ACCEL), report.cards.map { it.kind })
-        assertEquals("교차로 앞에서 미리 속도 줄이기", report.goal.title)
+        assertEquals("회전·교차로 앞에서 미리 속도 줄이기", report.goal.title)
+        assertEquals("회전·교차로 앞에서 급감속이 3번 있었어요", report.cards[1].fact)
     }
 
     @Test fun `횟수가 같으면 표의 위쪽 줄이 목표`() {

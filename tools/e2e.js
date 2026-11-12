@@ -11,7 +11,7 @@
  *   2) Virtual Console로 기어 D, 시속 50km까지 "1초에 5km씩" 천천히 올리며 달리고, "달린 거리"에 맞춰 조작
  *      (에뮬레이터는 목표 속도를 주면 1초 안에 바로 도달해서, 한 번에 50을 주면 급가속(1초 11km 이상)으로 기록된다)
  *        - 우회전(1540m, 3950m, 7060m): 깜빡이를 켜지 않음   -> 리포트에 "깜빡이 기록 없음"
- *        - 2850m 좌회전 앞(100m 안): 급하게 감속             -> 리포트에 "교차로 앞 급감속"
+ *        - 2850m 좌회전 앞(100m 안): 급하게 감속             -> 리포트에 "회전·교차로 앞 급감속"
  *        - 3100m: 질문 "비보호 좌회전은 언제 해"              -> 음성 답변 + 질문 기록
  *        - 6380m 좌회전: 100m 안에서 왼쪽 깜빡이를 켬         -> "방향지시등 작동 기록 있음"
  *      순항 속도는 시속 60km (전체 약 8분)
@@ -99,6 +99,20 @@ async function main() {
   shot('e2e_1_home.png');
 
   console.log('2) 홈 -> 주행 준비 -> 출발하기');
+  // 화면 반반 분할 확인: DriveMate 창 너비가 앱 영역 전체(약 1680px)이면 분할이 풀린 것이라 손잡이를 끌어 다시 나눈다
+  // (내비가 먼저 실행되어 있어야 한다. 손잡이 위치는 Connect 에뮬레이터 2560x1440 기준)
+  {
+    const act = adb('shell', 'dumpsys activity activities');
+    const m = act.match(/com\.example\.drivemate[\s\S]*?mBounds=Rect\((\d+), \d+ - (\d+)/);
+    const width = m ? Number(m[2]) - Number(m[1]) : 0;
+    if (width > 1200) {
+      adb('shell', 'input', 'swipe', '2547', '717', '1700', '717', '800');
+      await sleep(3000);
+      console.log('  화면 분할을 다시 설정함 (DriveMate 창 너비 ' + width + 'px)');
+    } else console.log('  화면 분할 상태 확인 (DriveMate 창 너비 ' + width + 'px)');
+  }
+  // 지난번 리포트 화면이 남아 있으면 먼저 홈으로 간다
+  try { tapText('홈으로'); await sleep(1500); } catch (_) { /* 이미 홈 화면 */ }
   tapText('주행 시작');
   await sleep(1500);
   shot('e2e_2_prep.png');
@@ -144,7 +158,7 @@ async function main() {
   desired = 0;
   // 1초에 5km씩 줄이므로 시속 60km에서는 12초 이상 걸린다. 목표가 0이 될 때까지 기다린다 (최대 40초)
   for (let i = 0; i < 160 && target.speed > 0; i++) { await rampTick(); await sleep(250); }
-  await controls({ speed: 0, brake: 30 });
+  await controls({ speed: 0, brake: 0 });   // 브레이크를 밟지 않는다 (밟으면 남은 속도가 한 번에 줄어 급감속으로 기록됨)
   for (let i = 0; i < 150; i++) {
     if (Number((await state()).controls.speed_kph) < 1) break;
     await sleep(200);
@@ -164,12 +178,13 @@ async function main() {
     ['우회전 코칭', /SAY: 곧 우회전이에요/],
     ['좌회전 코칭', /SAY: 곧 좌회전 구간이에요/],
     ['질문 답변', /SAY: 차량 신호가 녹색일 때/],
-    ['교차로 앞 급감속 기록', /EVENT: HARD_BRAKE .*nearTurn=true/],
+    ['회전·교차로 앞 급감속 기록', /EVENT: HARD_BRAKE .*nearTurn=true/],
     ['우회전 깜빡이 기록 없음', /EVENT: TURN .*direction=RIGHT signalUsed=false/],
     ['좌회전 깜빡이 기록 있음', /EVENT: TURN .*direction=LEFT signalUsed=true/],
     ['주행 종료와 다음 목표', /TRIP END .*goal=/],
     ['천천히 출발하면 급가속 기록 없음', { test: (l) => !/EVENT: HARD_ACCEL/.test(l) }],
     ['천천히 주차하면 일부러 한 1번 외 급감속 없음', { test: (l) => (l.match(/EVENT: HARD_BRAKE/g) || []).length === 1 }],
+    ['좌·우회전 8곳 모두 코칭 (같은 지점만 반복 금지)', { test: (l) => (l.match(/SAY: 곧 (좌회전|우회전)/g) || []).length === 8 }],
     ['첫 좌회전(80m)부터 코칭', { test: (l) => { const i = l.indexOf('TRIP START'); const j = l.indexOf('EVENT: TURN'); return i >= 0 && j > i && /SAY: 곧 좌회전/.test(l.slice(i, j)); } }],
   ];
   let failed = 0;

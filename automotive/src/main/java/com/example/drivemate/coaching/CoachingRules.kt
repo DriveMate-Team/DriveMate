@@ -52,16 +52,21 @@ class CoachingRules {
         ManeuverType.LEFT -> mode == DriveMode.BEGINNER || Topic.LEFT_TURN in topics
         ManeuverType.RIGHT -> mode == DriveMode.BEGINNER || Topic.RIGHT_TURN in topics
         ManeuverType.INTERSECTION -> Topic.INTERSECTION in topics
+        ManeuverType.MERGE -> true   // 고속도로 진입·합류는 두 모드 모두 안내 (속도 차이가 커서 놓치면 위험)
         ManeuverType.OTHER -> false
     }
 
     companion object {
         const val TURN_ANNOUNCE_M = 300          // 좌회전·우회전: 300m 전에 안내
         const val INTERSECTION_ANNOUNCE_M = 200  // 교차로: 200m 전에 안내
+        const val MERGE_ANNOUNCE_M = 500         // 고속도로 진입·합류: 500m 전에 안내 (팀 기준값, 테스트 후 조정)
         const val TOO_LATE_M = 50                // 이보다 가까우면 안내하지 않음
 
-        fun announceDistance(type: ManeuverType): Int =
-            if (type == ManeuverType.INTERSECTION) INTERSECTION_ANNOUNCE_M else TURN_ANNOUNCE_M
+        fun announceDistance(type: ManeuverType): Int = when (type) {
+            ManeuverType.INTERSECTION -> INTERSECTION_ANNOUNCE_M
+            ManeuverType.MERGE -> MERGE_ANNOUNCE_M
+            else -> TURN_ANNOUNCE_M
+        }
 
         /**
          * 상황별 문구.
@@ -75,6 +80,7 @@ class CoachingRules {
             ManeuverType.LEFT -> Coaching("LEFT", "곧 좌회전이에요. 신호 확인해 주세요.", "곧 좌회전이에요. 신호 확인해 주세요.")
             ManeuverType.RIGHT -> Coaching("RIGHT", "곧 우회전이에요. 보행자 확인해 주세요.", "곧 우회전이에요. 보행자 확인해 주세요.")
             ManeuverType.INTERSECTION -> Coaching("INTERSECTION", "교차로예요. 속도 줄여 주세요.", "교차로예요. 속도 줄여 주세요.")
+            ManeuverType.MERGE -> Coaching("MERGE", "곧 합류 구간이에요. 뒤차 확인해 주세요.", "곧 합류 구간이에요. 뒤차 확인해 주세요.")
             ManeuverType.OTHER -> null
         }
 
@@ -94,6 +100,11 @@ class CoachingRules {
                 key = "INTERSECTION",
                 speech = "교차로가 나와요. 신호가 바뀔 수 있으니 속도를 조금 줄여 주세요.",
                 bubble = "교차로가 나와요. 속도를 조금 줄여 주세요.",
+            )
+            ManeuverType.MERGE -> Coaching(
+                key = "MERGE",
+                speech = "곧 고속도로 합류 구간이에요. 사이드미러로 뒤차를 확인하고 속도를 맞춰 주세요.",
+                bubble = "곧 합류 구간이에요. 뒤차를 확인하고 속도를 맞춰 주세요.",
             )
             ManeuverType.OTHER -> null
         }

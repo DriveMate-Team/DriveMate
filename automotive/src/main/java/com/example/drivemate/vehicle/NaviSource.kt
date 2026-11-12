@@ -109,6 +109,8 @@ class PleosNaviSource @Inject constructor(
             // 확인된 형식: distance 단위는 m, 첫 번째가 "바로 다음 안내"(현재 위치부터의 거리),
             // 두 번째부터는 "앞 안내 지점부터의 거리"다 (모두 더하면 남은 총 거리와 비슷하다).
             logIfChanged("tbt", "NAVI tbt " + list.take(3).joinToString(" | ") { "${it.type}/${it.distance.toInt()}m/${it.description}" } + " (총 ${list.size}개)")
+            // 전체 경로의 회전 종류만 한 줄로 (고속도로 진입·합류 같은 종류가 오는지 확인용)
+            logIfChanged("tbtTypes", "NAVI tbtTypes " + list.joinToString(",") { "${it.type.name.removePrefix("TURN_")}:${it.distance.toInt()}" })
             val first = list.firstOrNull()
             if (first == null) {
                 _state.update { it.copy(next = null) }
@@ -197,11 +199,17 @@ class PleosNaviSource @Inject constructor(
     }
 }
 
-/** 내비의 회전 종류를 DriveMate의 상황 종류로 바꾼다 (좌·우회전만 코칭 대상, 직진은 교차로) */
+/**
+ * 내비의 회전 종류를 DriveMate의 상황 종류로 바꾼다.
+ * 좌·우회전, 직진(교차로), 고속도로 진입·합류만 코칭 대상이고 나머지는 OTHER.
+ * 고속도로 진입(ENTER_IC)·분기 합류(DEVIDE_MERGE)는 김포공항 경로 로그로 실제로 오는 것을 확인 (2026-11-13)
+ */
 fun TurnType.toManeuverType(): ManeuverType = when (this) {
     TurnType.TURN_LEFT, TurnType.TURN_SHARP_L -> ManeuverType.LEFT
     TurnType.TURN_RIGHT, TurnType.TURN_SHARP_R -> ManeuverType.RIGHT
     TurnType.TURN_STRAIGHT -> ManeuverType.INTERSECTION
+    TurnType.TURN_ENTER_IC_L, TurnType.TURN_ENTER_IC_R, TurnType.TURN_ENTER_IC_C,
+    TurnType.TURN_DEVIDE_MERGE -> ManeuverType.MERGE
     else -> ManeuverType.OTHER
 }
 
@@ -222,6 +230,10 @@ class ScenarioNaviSource @Inject constructor(
 
     private var traveledM = 0.0
     private var job: Job? = null
+
+    /** 지금 쓰는 데모 경로 (기본: 이마트 성남점) */
+    var route: DemoRoute = DemoRoute.EMART
+        set(value) { field = value; traveledM = 0.0; publish() }
 
     override fun start() {
         if (job != null) return
@@ -247,15 +259,15 @@ class ScenarioNaviSource @Inject constructor(
     override fun openNavi() {}
 
     private fun publish() {
-        val index = ROUTE.indexOfFirst { it.first > traveledM }
+        val points = route.points
+        val index = points.indexOfFirst { it.first > traveledM }
         val next = if (index < 0) null else {
-            Maneuver(id = index + 1, type = ROUTE[index].second, distanceM = (ROUTE[index].first - traveledM).toInt())
+            Maneuver(id = index + 1, type = points[index].second, distanceM = (points[index].first - traveledM).toInt())
         }
-        _state.value = NaviState(hasRoute = true, destination = DESTINATION, next = next)
+        _state.value = NaviState(hasRoute = true, destination = route.destination, next = next)
     }
 
     companion object {
-        const val DESTINATION = "이마트 성남점 (데모 경로)"
         private const val STEP_MS = 500L
 
         /**
@@ -279,11 +291,37 @@ class ScenarioNaviSource @Inject constructor(
             10 to TurnType.TURN_ARRIVE,         // 도착
         )
 
-        /** 출발점에서부터의 누적 거리(m)와 그 지점의 상황 (위 목록을 더해서 만든다. 총 7,070m) */
-        val ROUTE: List<Pair<Int, ManeuverType>> = REAL_LEGS
+        /**
+         * 김포공항 경로(같은 출발점 -> 김포국제공항 국내선, 40km)의 앞부분 2.9km. 고속도로 진입(IC) 코칭 시연용.
+         * NaviHelper 로그(2026-11-13) 그대로: 좌회전 80, 우회전 380, 고가 밑 우측 730, 우회전 1400, 고속도로 진입 200, 톨게이트 80
+         */
+        private val AIRPORT_LEGS = listOf(
+            80 to TurnType.TURN_LEFT,
+            380 to TurnType.TURN_RIGHT,
+            730 to TurnType.TURN_AVOID_UNDER_R,
+            1400 to TurnType.TURN_RIGHT,
+            200 to TurnType.TURN_ENTER_IC_C,     // 고속도로 진입
+            80 to TurnType.TURN_TOLL,
+        )
+
+        /** 앞 지점부터의 거리 목록을 "출발점부터의 누적 거리"로 바꾼다 */
+        fun cumulative(legs: List<Pair<Int, TurnType>>): List<Pair<Int, ManeuverType>> = legs
             .runningFold(0 to ManeuverType.OTHER) { acc, (leg, turn) -> (acc.first + leg) to turn.toManeuverType() }
             .drop(1)
+
+        /** 이마트 성남점 경로의 누적 거리 (총 7,070m) */
+        val ROUTE: List<Pair<Int, ManeuverType>> = cumulative(REAL_LEGS)
+        val AIRPORT_ROUTE: List<Pair<Int, ManeuverType>> = cumulative(AIRPORT_LEGS)
     }
+}
+
+/** 데모 경로 목록 */
+enum class DemoRoute(val destination: String) {
+    EMART("이마트 성남점 (데모 경로)"),
+    AIRPORT("김포공항 고속도로 진입 (데모 경로)");
+
+    val points: List<Pair<Int, ManeuverType>>
+        get() = if (this == AIRPORT) ScenarioNaviSource.AIRPORT_ROUTE else ScenarioNaviSource.ROUTE
 }
 
 /**
@@ -306,7 +344,8 @@ class SwitchingNaviSource @Inject constructor(
 
     override fun start() = pleos.start()
 
-    fun setDemo(enabled: Boolean) {
+    fun setDemo(enabled: Boolean, route: DemoRoute? = null) {
+        if (route != null) scenario.route = route
         if (enabled) scenario.start()
         demo.value = enabled
     }

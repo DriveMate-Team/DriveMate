@@ -77,6 +77,16 @@ class CoachingRulesTest {
         assertNotNull(rules.onNavi(Maneuver(2, left, 300), DriveMode.BEGINNER, emptySet(), 5_000))  // 5초 뒤 다른 좌회전
     }
 
+    @Test fun `고속도로 합류는 500m 전에 두 모드 모두 안내한다`() {
+        val merge = ManeuverType.MERGE
+        assertNull(CoachingRules().onNavi(Maneuver(1, merge, 600), DriveMode.NORMAL, emptySet(), 0))
+        assertEquals("곧 합류 구간이에요. 뒤차 확인해 주세요.", CoachingRules().onNavi(Maneuver(1, merge, 480), DriveMode.NORMAL, emptySet(), 0)?.speech)
+        assertEquals(
+            "곧 고속도로 합류 구간이에요. 사이드미러로 뒤차를 확인하고 속도를 맞춰 주세요.",
+            CoachingRules().onNavi(Maneuver(1, merge, 200), DriveMode.BEGINNER, emptySet(), 0)?.speech,
+        )
+    }
+
     @Test fun `일반 모드는 간단한 문구로 말한다`() {
         val c = CoachingRules().onNavi(Maneuver(1, right, 300), DriveMode.NORMAL, setOf(Topic.RIGHT_TURN), 0)
         assertEquals("곧 우회전이에요. 보행자 확인해 주세요.", c?.speech)

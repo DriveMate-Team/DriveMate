@@ -40,6 +40,7 @@ enum class ManeuverType(val label: String) {
     LEFT("좌회전"),
     RIGHT("우회전"),
     INTERSECTION("교차로"),
+    MERGE("합류"),   // 고속도로 진입(IC)·분기 합류 지점 (신청서 3-①)
     OTHER("안내"),
 }
 

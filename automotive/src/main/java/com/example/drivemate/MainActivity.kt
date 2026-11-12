@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.example.drivemate.drive.DriveSession
 import com.example.drivemate.ui.AppNav
 import com.example.drivemate.ui.theme.DriveMateTheme
+import com.example.drivemate.vehicle.DemoRoute
 import com.example.drivemate.vehicle.SwitchingNaviSource
 import com.example.drivemate.vehicle.VehicleSource
 import com.example.drivemate.voice.SpeechOutput
@@ -64,7 +65,9 @@ class MainActivity : ComponentActivity() {
      */
     private fun handleDebugIntent(intent: Intent?) {
         if (!BuildConfig.DEBUG || intent == null) return
-        if (intent.hasExtra("demo")) navi.setDemo(intent.getBooleanExtra("demo", false))
+        // --es demoRoute AIRPORT : 고속도로 진입 데모 경로 (기본 EMART)
+        val route = intent.getStringExtra("demoRoute")?.let { name -> DemoRoute.entries.find { it.name == name } }
+        if (intent.hasExtra("demo")) navi.setDemo(intent.getBooleanExtra("demo", false), route)
         intent.getStringExtra("ask")?.let { session.onQuestionText(it) }
     }
 

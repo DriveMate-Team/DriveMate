@@ -10,6 +10,9 @@
  *   node tools/scene.js 5        리포트 화면 그대로 (질문할 시간 20초). 장면 4 바로 뒤에 찍는다
  *   node tools/scene.js 6        홈 화면으로. 장면 5 뒤에 찍는다
  *
+ * 녹화: 장면마다 "준비 끝"이 나오면 Win+Alt+R로 직접 녹화를 켜고 엔터, 끝나면 Win+Alt+R로 끈다.
+ *       (스크립트가 보낸 키는 Game Bar가 받지 않아서 자동으로 하지 못한다)
+ *
  * 기록이 꼬이지 않게: 장면 1~4는 시작할 때 앱 기록을 "기준 기록"으로 되돌린다.
  * 그래서 몇 번을 다시 찍어도 홈은 항상 같은 상태(2회차, 교차로 연습 중)에서 시작한다.
  * 장면 5·6은 장면 4가 만든 주행을 이어서 보여 주므로 기록을 되돌리지 않는다.
@@ -79,6 +82,20 @@ async function tapText(text, tries = 4) {
 function launch(extra = []) {
   adb(['shell', 'am', 'start', '--user', '10', '-n', `${PKG}/.MainActivity`, ...extra], { stdio: 'ignore' });
 }
+// 반반 분할(내비 + DriveMate)인지: 분할이면 내비 창(ai.umos.maps...)이 화면에 보인다
+function isSplit() {
+  const out = adb(['shell', 'dumpsys activity activities'], { encoding: 'utf8' });
+  return out.split('\n').some((l) => l.includes('* Task{') && l.includes('ai.umos.maps.android.navigation.app') && l.includes('visible=true'));
+}
+// 풀려 있으면 앱 오른쪽 끝 "⋮" 손잡이를 끌어 다시 나눈다
+async function ensureSplit() {
+  for (let i = 0; i < 3 && !isSplit(); i++) {
+    say('  반반 분할이 풀려 있어 다시 나눠요.');
+    adb(['shell', 'input', 'swipe', '2547', '717', '1700', '717', '800']);
+    await sleep(2500);
+  }
+  if (!isSplit()) throw new Error('반반 분할을 만들지 못했어요. 화면 오른쪽 끝 ⋮ 를 직접 끌어 주세요');
+}
 async function countdown(sec, label) {
   for (let s = sec; s > 0; s--) { process.stdout.write(`\r  ${label} ${s}초 `); await sleep(1000); }
   process.stdout.write('\n');
@@ -107,6 +124,7 @@ async function resetToBase(route, startM) {
   }
   launch(['--ez', 'demo', 'true', '--es', 'demoRoute', route, '--ei', 'demoStartM', String(startM)]);
   await sleep(4000);
+  await ensureSplit();
 }
 // 홈에서 주행 화면까지 바로 간다 (녹화 전 준비)
 async function goDriving() {
@@ -115,10 +133,21 @@ async function goDriving() {
   await gear('Drive');
 }
 let recStart = 0; // 녹화 시작 시각 (장면 길이 재기용)
+// 엔터를 기다린다 (녹화 키는 직접 누른다: 스크립트가 보낸 Win+Alt+R은 Game Bar가 받지 않았다, 2026-11-14 확인)
+function waitEnter(msg) {
+  process.stdout.write(msg);
+  return new Promise((r) => process.stdin.once('data', () => { process.stdin.pause(); r(); }));
+}
 async function ready() {
-  say('  준비 끝. 녹화를 시작하세요.');
+  await ensureSplit();
+  await waitEnter('  준비 끝. 에뮬레이터 창을 누르고 Win+Alt+R로 녹화를 시작한 뒤, 여기서 엔터를 누르세요. ');
   await countdown(3, '시작까지');
   recStart = Date.now();
+}
+// 질문 장면: 마이크는 Game Bar(Win+Alt+M)로 직접 켠다
+async function askTime(sec) {
+  say('  ★ Win+Alt+M으로 Game Bar 마이크를 켜고, 앱의 마이크 버튼을 누른 뒤 지금 말하세요.');
+  await countdown(sec, '질문 시간');
 }
 
 // ---------- 장면 ----------
@@ -154,8 +183,7 @@ const scenes = {
     await goDriving();
     await ready();
     await ramp(40, 10, 1000);
-    say('  마이크를 눌러 질문하세요.');
-    await countdown(20, '질문 시간');
+    await askTime(20);
   },
   // 4. 교차로 210m 전 → 코칭(200m) → 천천히 멈춤 → P → 리포트
   async 4() {
@@ -175,8 +203,7 @@ const scenes = {
     launch();
     await sleep(1000);
     await ready();
-    say('  마이크를 눌러 질문하세요.');
-    await countdown(20, '질문 시간');
+    await askTime(20);
   },
   // 6. 홈 화면 (장면 5 뒤)
   async 6() {
@@ -195,6 +222,7 @@ async function main() {
   try {
     say(`=== 장면 ${arg} ===`);
     await scene();
+    say('  ■ Win+Alt+R로 녹화를 멈추세요. (동영상\캡처 폴더에 저장돼요. 질문 장면이면 Win+Alt+M으로 마이크도 끄세요)');
     say(`=== 장면 ${arg} 끝 (녹화 구간 약 ${Math.round((Date.now() - recStart) / 1000)}초) ===`);
   } finally {
     stop();

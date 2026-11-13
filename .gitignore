@@ -16,3 +16,6 @@ local.properties
 
 build/
 .kotlin/
+
+# 문서·팀 자료는 올리지 않는다 (내 PC에만 둔다)
+docs/

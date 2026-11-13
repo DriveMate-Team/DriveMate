@@ -79,7 +79,7 @@ val DarkColors = DmColors(
 
 /**
  * 글꼴: Pretendard (설계문서 3단계). res/font 폴더의 글꼴 파일 3개(보통·중간·굵게)를 쓴다.
- * 라이선스: SIL Open Font License 1.1 (docs/LICENSE_Pretendard.txt). 앱에 넣어 배포해도 된다.
+ * 라이선스: SIL Open Font License 1.1 (LICENSE_Pretendard.txt). 앱에 넣어 배포해도 된다.
  */
 val Pretendard = FontFamily(
     Font(R.font.pretendard_regular, FontWeight.Normal),

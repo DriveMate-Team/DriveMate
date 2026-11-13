@@ -2,7 +2,8 @@
 /**
  * 연수 로드맵 시연용 주행: 김포공항 데모 경로(2.9km, 고속도로 진입 포함)를 "회전마다 맞는 쪽 깜빡이를 켜고" 달린다.
  *
- *   node tools/roadmap_demo.js [횟수=2]
+ *   node tools/roadmap_demo.js [횟수=2] [끝 거리 m=2900]
+ *   영상용(합류 전에 멈춤 → 좌·우회전만 완료, 교차로 "지금 연습 중", 합류 남음): node tools/roadmap_demo.js 2 2650
  *
  * 2번 달리면 기록 기준으로 로드맵의 "좌회전"(2번 연속 깜빡이 기록)과 "고속도로 합류"(1번 지남)가 완료된다.
  * 각 주행 뒤에 리포트 화면이 docs/screenshots/v2/roadmap_report_N.png 로 저장된다.
@@ -27,7 +28,14 @@ const put = async (p) => { const r = await fetch(BASE + p, { method: 'PUT' }); i
 const state = async () => (await fetch(BASE + '/vehicle/state', { cache: 'no-store' })).json();
 const speed = (s) => put(`/vehicle/controls?speed=${s}&accelerator=0&brake=0&steering=0`);
 const signal = (m) => put('/vehicle/turn-signal?mode=' + m);
-const gear = (g) => put('/vehicle/gear?gear=' + g);
+// 기어: 에뮬레이터를 막 켠 뒤에는 첫 변경이 무시될 때가 있어서, 실제로 바뀔 때까지 다시 보낸다
+const gear = async (g) => {
+  for (let i = 0; i < 10; i++) {
+    await put('/vehicle/gear?gear=' + g); await sleep(500);
+    if ((await state()).gear?.actual?.value === g) return;
+  }
+  throw new Error('기어가 ' + g + '로 바뀌지 않습니다');
+};
 
 // 화면 글자를 찾아 누른다 (e2e.js와 같은 방식: 분할 화면에서는 DriveMate 창을 먼저 눌러 초점을 옮긴다)
 // 화면이 막 바뀐 직후에는 이전 창을 읽을 수 있어서 최대 3번 다시 읽는다
@@ -46,7 +54,8 @@ function tapText(text, tries = 3) {
 // 김포공항 데모 경로(NaviSource.AIRPORT_LEGS)의 누적 거리: 좌 80, 우 460, 고가 밑 우측 1190, 우 2590, 고속도로 진입 2790, 톨게이트 2870
 // 각 회전 지점 80m 앞부터 40m 뒤까지 그쪽 깜빡이를 켠다 (앱은 100m 안에서 켜졌는지 본다)
 const SIGNALS = [[0, 120, 'BlinkLeft'], [380, 500, 'BlinkRight'], [1110, 1230, 'BlinkRight'], [2510, 2630, 'BlinkRight']];
-const END_M = 2900;
+// 고속도로 진입(2790m) 100m 안에 들어가지 않고 멈추려면 2690m 이하로 준다
+let END_M = 2900;
 
 async function drive(n) {
   console.log(`\n=== ${n}번째 주행 ===`);
@@ -81,6 +90,7 @@ async function drive(n) {
 
 async function main() {
   const runs = Number(process.argv[2] || 2);
+  if (process.argv[3]) END_M = Number(process.argv[3]);
   // 하트비트: Virtual Console은 신호가 3초 넘게 없으면 조작을 거부한다(503). 먼저 보내고 준비될 때까지 기다린다
   const beat = () => fetch(`${BASE}/browser/session?client=roadmap`, { method: 'POST' }).catch(() => {});
   await beat();
@@ -92,7 +102,8 @@ async function main() {
   }
   try {
     for (let i = 1; i <= runs; i++) await drive(i);
-    const log = adb('shell', "logcat -d -s DriveMate:I | grep -E 'EVENT: (TURN|POINT_PASSED)|TRIP END'");
+    // 기기 안 grep은 긴 로그에서 죽을 수 있어서 PC에서 거른다
+    const log = adb('logcat', '-d', '-s', 'DriveMate:I').split('\n').filter((l) => /EVENT: (TURN|POINT_PASSED)|TRIP END/.test(l)).join('\n');
     console.log('\n===== 기록 =====\n' + log);
   } finally {
     clearInterval(hb);

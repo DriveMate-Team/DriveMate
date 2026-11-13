@@ -151,7 +151,9 @@ fun PrepScreen(onBack: () -> Unit, viewModel: PrepViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Topic.entries.forEach { t ->
-                    DmChoice(t.label, selected = t in topics, onClick = { viewModel.toggleTopic(t) })
+                    // 차선 정보를 읽을 수 없어 차선 변경은 코칭 없이 질문만 받는다 (DRIVEMATE_V2.md "차선 정보")
+                    val label = if (t == Topic.LANE_CHANGE) "${t.label} (질문만)" else t.label
+                    DmChoice(label, selected = t in topics, onClick = { viewModel.toggleTopic(t) })
                 }
             }
         }

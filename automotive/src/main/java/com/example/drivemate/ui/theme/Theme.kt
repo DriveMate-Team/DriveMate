@@ -92,6 +92,7 @@ object DmType {
     val coaching = TextStyle(fontFamily = Pretendard, fontSize = 40.sp, lineHeight = 54.sp, fontWeight = FontWeight.Bold)
     val title = TextStyle(fontFamily = Pretendard, fontSize = 32.sp, lineHeight = 42.sp, fontWeight = FontWeight.Bold)
     val body = TextStyle(fontFamily = Pretendard, fontSize = 24.sp, lineHeight = 34.sp, fontWeight = FontWeight.Medium)
+    val button = TextStyle(fontFamily = Pretendard, fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold)   // 큰 버튼 글자: 24sp 굵게
     val sub = TextStyle(fontFamily = Pretendard, fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Normal)
 }
 

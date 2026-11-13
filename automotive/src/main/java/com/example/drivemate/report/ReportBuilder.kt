@@ -13,6 +13,9 @@ enum class CardKind { SIGNAL, BRAKE, ACCEL, OTHER_EVENTS, QUESTION, CLEAN }
 data class ReportCard(val kind: CardKind, val fact: String, val tip: String)
 
 /** 다음 연습 목표 (항상 하나만) */
+/**
+ * @param detail 시점 말("오늘", "지난 주행에서")이 없는 사실 한 문장. 리포트는 "이번 주행에서 ", 홈은 "지난 주행에서 "를 앞에 붙인다
+ */
 data class Goal(val title: String, val detail: String)
 
 /** 리포트 화면에 필요한 계산 결과 */
@@ -50,7 +53,7 @@ object ReportBuilder {
                         "다음엔 코칭을 조금 줄여 볼까요?",
                     )
                 ),
-                goal = Goal("코칭을 조금 줄여 보기", "오늘 기록된 급가속·급감속 없음"),
+                goal = Goal("코칭을 조금 줄여 보기", "기록된 급가속·급감속이 없었어요"),
             )
         }
 
@@ -63,10 +66,10 @@ object ReportBuilder {
         val goal = when {
             strong != null -> strong.goal
             candidates.isEmpty() && questionTopic != null ->
-                Goal("$questionTopic 연습하기", "오늘 물어본 주제")
+                Goal("$questionTopic 연습하기", "$questionTopic${josa(questionTopic, "을", "를")} 물어보셨어요")
             candidates.isNotEmpty() -> candidates.maxBy { it.count }.goal
-            questionTopic != null -> Goal("$questionTopic 연습하기", "오늘 물어본 주제")
-            else -> Goal("속도를 천천히 바꾸기", "오늘 급가속·급감속 기록이 있었어요")
+            questionTopic != null -> Goal("$questionTopic 연습하기", "$questionTopic${josa(questionTopic, "을", "를")} 물어보셨어요")
+            else -> Goal("속도를 천천히 바꾸기", "급가속·급감속 기록이 있었어요")
         }
         return Report(cards, goal)
     }
@@ -101,7 +104,7 @@ object ReportBuilder {
                 "회전 지점 30미터 전에는 꼭 켜 두세요",
             ),
             count = missed,
-            goal = Goal("$name 전 깜빡이 미리 켜기", "오늘 ${total}번 중 ${missed}번 기록 없음"),
+            goal = Goal("$name 전 깜빡이 미리 켜기", fact),
         )
     }
 
@@ -117,7 +120,7 @@ object ReportBuilder {
                 "회전·교차로 안내를 들으면 발을 가속 페달에서 떼 보세요",
             ),
             count = count,
-            goal = Goal("회전·교차로 앞에서 미리 속도 줄이기", "오늘 회전·교차로 앞 급감속 ${count}번"),
+            goal = Goal("회전·교차로 앞에서 미리 속도 줄이기", "회전·교차로 앞 급감속이 ${count}번 있었어요"),
         )
     }
 
@@ -132,7 +135,7 @@ object ReportBuilder {
                 "처음 3초는 가속 페달을 살짝만 눌러 보세요",
             ),
             count = count,
-            goal = Goal("출발할 때 천천히 가속하기", "오늘 출발 때 급가속 ${count}번"),
+            goal = Goal("출발할 때 천천히 가속하기", "출발할 때 급가속이 ${count}번 있었어요"),
         )
     }
 

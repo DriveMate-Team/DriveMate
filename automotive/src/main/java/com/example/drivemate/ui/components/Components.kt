@@ -98,7 +98,7 @@ fun DmButton(
             .padding(horizontal = 36.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = DmType.body, color = textColor, textAlign = TextAlign.Center, maxLines = 2)
+        Text(text, style = DmType.button, color = textColor, textAlign = TextAlign.Center, maxLines = 2)
     }
 }
 

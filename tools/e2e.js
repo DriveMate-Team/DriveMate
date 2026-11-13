@@ -94,7 +94,7 @@ async function main() {
   await gear('Park');
   // 화면 분할을 유지하려고 앱을 끄지 않고 앞으로 불러온다
   adb('logcat', '-c');
-  adb('shell', 'am', 'start', '--user', '10', '-n', `${PKG}/.MainActivity`, '--ez', 'demo', 'true');
+  adb('shell', 'am', 'start', '--user', '10', '-n', `${PKG}/.MainActivity`, '--ez', 'demo', 'true', '--es', 'demoRoute', 'EMART');   // 경로를 꼭 적는다 (안 적으면 마지막에 쓴 경로가 남는다)
   await sleep(5000);
   shot('e2e_1_home.png');
 
@@ -177,7 +177,7 @@ async function main() {
   const expect = [
     ['우회전 코칭', /SAY: 곧 우회전이에요/],
     ['좌회전 코칭', /SAY: 곧 좌회전 구간이에요/],
-    ['질문 답변', /SAY: 차량 신호가 녹색일 때/],
+    ['질문 답변', /SAY: 비보호 좌회전 표지가 있는 곳에서/],
     ['회전·교차로 앞 급감속 기록', /EVENT: HARD_BRAKE .*nearTurn=true/],
     ['우회전 깜빡이 기록 없음', /EVENT: TURN .*direction=RIGHT signalUsed=false/],
     ['좌회전 깜빡이 기록 있음', /EVENT: TURN .*direction=LEFT signalUsed=true/],

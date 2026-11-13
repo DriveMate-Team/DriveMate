@@ -180,7 +180,16 @@ class EventDetectorTest {
     @Test fun `교차로 직진은 회전 이벤트로 기록하지 않는다`() {
         val d = EventDetector()
         d.onSample(40f, Maneuver(1, ManeuverType.INTERSECTION, 50), emptySet(), 0)
-        assertTrue(d.onSample(40f, null, emptySet(), 1000).isEmpty())
+        // 회전(TurnPassed)이 아니라 "지점 지남"으로만 기록한다
+        assertEquals(listOf(DetectedEvent.PointPassed(ManeuverType.INTERSECTION, 40f)), d.onSample(40f, null, emptySet(), 1000))
+    }
+
+    @Test fun `합류 지점도 100m 안에 들어왔다 지나가면 지점 지남으로 기록한다`() {
+        val d = EventDetector()
+        d.onSample(80f, Maneuver(1, ManeuverType.MERGE, 300), emptySet(), 0)
+        assertTrue(d.onSample(80f, null, emptySet(), 1000).isEmpty())       // 100m 안에 안 들어왔으면 기록 안 함
+        d.onSample(80f, Maneuver(2, ManeuverType.MERGE, 60), emptySet(), 2000)
+        assertEquals(listOf(DetectedEvent.PointPassed(ManeuverType.MERGE, 80f)), d.onSample(80f, null, emptySet(), 3000))
     }
 }
 
@@ -200,7 +209,7 @@ class ReportBuilderTest {
         assertEquals("우회전 3번 중 2번은 깜빡이 기록이 없었어요", report.cards[0].fact)
         assertEquals("회전 지점 30미터 전에는 꼭 켜 두세요", report.cards[0].tip)
         assertEquals("우회전 전 깜빡이 미리 켜기", report.goal.title)
-        assertEquals("오늘 3번 중 2번 기록 없음", report.goal.detail)
+        assertEquals("우회전 3번 중 2번은 깜빡이 기록이 없었어요", report.goal.detail)
     }
 
     @Test fun `여러 개가 해당하면 횟수가 가장 많은 것이 목표`() {

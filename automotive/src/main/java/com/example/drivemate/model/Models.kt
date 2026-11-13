@@ -64,7 +64,8 @@ enum class EventType(val label: String) {
     HARD_ACCEL("급가속"),
     TURN("회전"),
     DIFFICULT("어려웠던 곳"),
-    IRREGULAR_SPEED("불규칙한 속도 변화"),   // D항목: 팀 기준값 (EventDetector 참고)
+    IRREGULAR_SPEED("불규칙한 속도 변화"),
+    POINT_PASSED("지점 지남"),   // 교차로·합류 지점을 지남. direction에 "INTERSECTION" / "MERGE" (로드맵용, 리포트 목록에는 안 보임)   // D항목: 팀 기준값 (EventDetector 참고)
 }
 
 /** 쉼표로 이어 붙인 글자("LEFT_TURN,INTERSECTION")를 연습 주제 묶음으로 바꾼다 (DB 저장용) */

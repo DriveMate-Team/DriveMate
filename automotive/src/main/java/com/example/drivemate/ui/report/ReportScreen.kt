@@ -1,5 +1,9 @@
 package com.example.drivemate.ui.report
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -113,7 +117,7 @@ class ReportViewModel @Inject constructor(
                 ).joinToString(" · "),
                 cards = report.cards,
                 goal = report.goal,
-                events = events.map { it.toRow() },
+                events = events.filter { it.type != EventType.POINT_PASSED.name }.map { it.toRow() },   // "지점 지남"은 로드맵용이라 목록에 안 보인다
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ReportUi())
 
@@ -216,7 +220,7 @@ private fun GoalCard(goal: Goal?, onHome: () -> Unit, modifier: Modifier) {
     DmCard(modifier, border = colors.accent) {
         Text("다음 연습 목표", style = DmType.sub, color = colors.textSub)
         Text(goal?.title ?: "", style = DmType.title, color = colors.accentText)
-        Text(goal?.detail ?: "", style = DmType.body, color = colors.text)
+        Text(goal?.detail?.let { "이번 주행에서 $it" } ?: "", style = DmType.body, color = colors.text)
         DmButton("홈으로", onHome, Modifier.fillMaxWidth().padding(top = 16.dp).height(120.dp))
     }
 }
@@ -230,16 +234,35 @@ private fun CompareCard(rows: List<CompareRow>) {
         if (rows.isEmpty()) {
             Text("두 주행 모두 기록된 급가속·급감속·깜빡이 누락이 없어요", style = DmType.body, color = colors.text)
         }
+        // 같은 줄끼리 막대 길이를 비교할 수 있게, 카드 안 모든 막대는 같은 최댓값을 기준으로 그린다
+        val max = rows.maxOfOrNull { maxOf(it.before, it.now) }?.coerceAtLeast(1) ?: 1
         rows.forEach { row ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                DmDot(if (row.trend == Trend.FEWER) colors.good else colors.outline)
-                Text("${row.label} ${row.before} → ${row.now}", style = DmType.body, color = colors.text, modifier = Modifier.weight(1f))
-                Text(
-                    row.text, style = DmType.body,
-                    color = if (row.trend == Trend.FEWER) colors.goodText else colors.textSub,
-                )
+            val fewer = row.trend == Trend.FEWER
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(row.label, style = DmType.body, color = colors.text, modifier = Modifier.weight(1f))
+                    Text(row.text, style = DmType.body, color = if (fewer) colors.goodText else colors.textSub)
+                }
+                CompareBar("지난", row.before, max, colors.outline)
+                // 줄었으면 초록, 같거나 늘었으면 회색 (빨간색은 쓰지 않는다). 색만으로 구분하지 않게 숫자와 글자도 함께 둔다
+                CompareBar("이번", row.now, max, if (fewer) colors.good else colors.textSub)
             }
         }
+    }
+}
+
+/** 비교 막대 한 줄: [지난] ■■■■■ 3 */
+@Composable
+private fun CompareBar(label: String, value: Int, max: Int, color: Color) {
+    val colors = DmTheme.colors
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(label, style = DmType.sub, color = colors.textSub, modifier = Modifier.width(56.dp))
+        Box(Modifier.weight(1f).height(24.dp)) {
+            // 0번이어도 아주 짧은 막대를 남겨 "0"이 보이게 한다
+            val fraction = (value.toFloat() / max).coerceIn(0.02f, 1f)
+            Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(color))
+        }
+        Text("${value}번", style = DmType.sub, color = colors.text, modifier = Modifier.width(56.dp))
     }
 }
 

@@ -179,7 +179,7 @@ class DriveSession @Inject constructor(
             val tooShortToJudge = distanceM < MIN_GOAL_TRIP_M && events.isEmpty() && questions.isEmpty()
             if (!tooShortToJudge) {
                 repo.saveProfile(
-                    repo.getProfile().copy(goalTitle = report.goal.title, goalDetail = "지난 주행 · ${report.goal.detail}")
+                    repo.getProfile().copy(goalTitle = report.goal.title, goalDetail = "지난 주행에서 ${report.goal.detail}")
                 )
             }
             Log.i(TAG, "TRIP END id=$id distance=${distanceM.toInt()}m events=${events.size} questions=${questions.size} goal=${report.goal.title}")
@@ -366,6 +366,8 @@ class DriveSession @Inject constructor(
                             saveEvent(id, EventType.HARD_ACCEL, event.speedKmh, fromStop = event.fromStop)
                         is DetectedEvent.IrregularSpeed ->
                             saveEvent(id, EventType.IRREGULAR_SPEED, event.speedKmh)
+                        is DetectedEvent.PointPassed ->
+                            saveEvent(id, EventType.POINT_PASSED, event.speedKmh, direction = event.type.name)
                         is DetectedEvent.TurnPassed ->
                             saveEvent(
                                 id, EventType.TURN, event.speedKmh,

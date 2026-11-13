@@ -1,5 +1,11 @@
 package com.example.drivemate.ui.drive
 
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.zIndex
+import com.example.drivemate.ui.components.BubbleTail
+import com.example.drivemate.ui.components.CoachAvatar
+import com.example.drivemate.ui.components.DmIcon
+import com.example.drivemate.ui.components.arrowIcon
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -105,21 +111,31 @@ private fun InfoPanel(state: DriveState, modifier: Modifier) {
         DmTag("연습: ${state.topics.toLabel()}")
 
         // 다음 상황 카드: "다음: 좌회전 · 300m"
+        // 왼쪽 화살표는 옆 글자와 같은 내용을 그림으로 보여줄 뿐, 새 정보를 더하지 않는다 (최소 정보 원칙)
         DmCard(Modifier.fillMaxWidth()) {
             val next = state.next
-            Text(
-                text = when {
-                    !state.hasRoute -> "내비 경로 없음"
-                    next == null -> "다음 안내 없음"
-                    else -> "다음: ${next.type.label} · ${formatRemaining(next.distanceM)}"
-                },
-                style = DmType.title, color = colors.text, maxLines = 1,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                val arrow = next?.takeIf { state.hasRoute }?.type?.arrowIcon()
+                if (arrow != null) DmIcon(arrow, colors.accentText, 96.dp)   // 아이콘 기본 칸 48dp의 2배
+                Text(
+                    text = when {
+                        !state.hasRoute -> "내비 경로 없음"
+                        next == null -> "다음 안내 없음"
+                        else -> "다음: ${next.type.label} · ${formatRemaining(next.distanceM)}"
+                    },
+                    style = DmType.title, color = colors.text, maxLines = 1,
+                )
+            }
         }
 
-        // 코칭 말풍선 (Gleo가 말하는 모양과 비슷하게: 둥근 카드 + 파란 테두리)
-        DmCard(Modifier.fillMaxWidth().weight(1f, fill = false), border = colors.accent, padding = 36.dp) {
-            Text(state.bubble, style = DmType.coaching, color = colors.text, maxLines = 3)
+        // 코칭 말풍선: 왼쪽 아래의 코치 얼굴이 말하는 모양 (꼬리가 얼굴을 가리킨다). 움직이지 않는다
+        Row(Modifier.fillMaxWidth().weight(1f, fill = false), verticalAlignment = Alignment.Bottom) {
+            CoachAvatar(64.dp)
+            // 꼬리를 카드 테두리 위로 3dp 겹쳐 그려서 꼬리와 카드 사이 선을 가린다
+            BubbleTail(Modifier.padding(start = 8.dp, bottom = 24.dp).offset(x = 3.dp).zIndex(1f))
+            DmCard(Modifier.weight(1f), border = colors.accent, padding = 36.dp) {
+                Text(state.bubble, style = DmType.coaching, color = colors.text, maxLines = 3)
+            }
         }
     }
 }

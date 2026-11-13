@@ -75,5 +75,5 @@ data class ProfileEntity(
     val mode: String = "BEGINNER",                // 마지막으로 고른 모드
     val topics: String = "INTERSECTION",          // 마지막으로 고른 연습 주제
     val goalTitle: String? = null,                // 지난 리포트가 정한 "다음 연습 목표" (없으면 null)
-    val goalDetail: String? = null,               // 목표 아래 한 줄 설명 (예: "지난 주행: 3번 중 2번 기록 없음")
+    val goalDetail: String? = null,               // 목표 아래 한 줄 설명 (예: "지난 주행에서 좌회전 1번 중 1번은 깜빡이 기록이 없었어요")
 )

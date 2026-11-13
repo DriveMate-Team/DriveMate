@@ -233,7 +233,11 @@ class ScenarioNaviSource @Inject constructor(
 
     /** 지금 쓰는 데모 경로 (기본: 이마트 성남점) */
     var route: DemoRoute = DemoRoute.EMART
-        set(value) { field = value; traveledM = 0.0; publish() }
+        set(value) { field = value; traveledM = startM.toDouble(); publish() }
+
+    /** 시연 영상 장면용: 경로의 이 지점(m)부터 출발한 것으로 친다 (기본 0 = 출발점) */
+    var startM: Int = 0
+        set(value) { field = value; traveledM = value.toDouble(); publish() }
 
     override fun start() {
         if (job != null) return
@@ -252,7 +256,7 @@ class ScenarioNaviSource @Inject constructor(
     }
 
     override fun onTripStart() {
-        traveledM = 0.0
+        traveledM = startM.toDouble()
         publish()
     }
 
@@ -304,6 +308,15 @@ class ScenarioNaviSource @Inject constructor(
             80 to TurnType.TURN_TOLL,
         )
 
+        /**
+         * 시연 영상 장면 4 전용 짧은 경로: 교차로(직진 안내) 300m 뒤 도착.
+         * 실제 내비 로그의 두 경로에는 직진 안내(교차로) 지점이 없어서 장면 촬영용으로 따로 둔다.
+         */
+        private val CROSS_LEGS = listOf(
+            300 to TurnType.TURN_STRAIGHT,
+            400 to TurnType.TURN_ARRIVE,
+        )
+
         /** 앞 지점부터의 거리 목록을 "출발점부터의 누적 거리"로 바꾼다 */
         fun cumulative(legs: List<Pair<Int, TurnType>>): List<Pair<Int, ManeuverType>> = legs
             .runningFold(0 to ManeuverType.OTHER) { acc, (leg, turn) -> (acc.first + leg) to turn.toManeuverType() }
@@ -312,16 +325,22 @@ class ScenarioNaviSource @Inject constructor(
         /** 이마트 성남점 경로의 누적 거리 (총 7,070m) */
         val ROUTE: List<Pair<Int, ManeuverType>> = cumulative(REAL_LEGS)
         val AIRPORT_ROUTE: List<Pair<Int, ManeuverType>> = cumulative(AIRPORT_LEGS)
+        val CROSS_ROUTE: List<Pair<Int, ManeuverType>> = cumulative(CROSS_LEGS)
     }
 }
 
 /** 데모 경로 목록 */
 enum class DemoRoute(val destination: String) {
     EMART("이마트 성남점"),
-    AIRPORT("김포공항");
+    AIRPORT("김포공항"),
+    CROSS("이마트 성남점");   // 시연 영상 장면 4 전용 (교차로 지점)
 
     val points: List<Pair<Int, ManeuverType>>
-        get() = if (this == AIRPORT) ScenarioNaviSource.AIRPORT_ROUTE else ScenarioNaviSource.ROUTE
+        get() = when (this) {
+            AIRPORT -> ScenarioNaviSource.AIRPORT_ROUTE
+            CROSS -> ScenarioNaviSource.CROSS_ROUTE
+            EMART -> ScenarioNaviSource.ROUTE
+        }
 }
 
 /**
@@ -344,7 +363,8 @@ class SwitchingNaviSource @Inject constructor(
 
     override fun start() = pleos.start()
 
-    fun setDemo(enabled: Boolean, route: DemoRoute? = null) {
+    fun setDemo(enabled: Boolean, route: DemoRoute? = null, startM: Int? = null) {
+        if (startM != null) scenario.startM = startM
         if (route != null) scenario.route = route
         if (enabled) scenario.start()
         demo.value = enabled

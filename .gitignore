@@ -20,3 +20,4 @@ build/
 # 문서·팀 자료는 올리지 않는다 (내 PC에만 둔다)
 docs/
 CLAUDE.md
+tools/.scene_base/

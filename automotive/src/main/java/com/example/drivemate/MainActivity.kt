@@ -67,7 +67,9 @@ class MainActivity : ComponentActivity() {
         if (!BuildConfig.DEBUG || intent == null) return
         // --es demoRoute AIRPORT : 고속도로 진입 데모 경로 (기본 EMART)
         val route = intent.getStringExtra("demoRoute")?.let { name -> DemoRoute.entries.find { it.name == name } }
-        if (intent.hasExtra("demo")) navi.setDemo(intent.getBooleanExtra("demo", false), route)
+        // --ei demoStartM 81 : 경로의 81m 지점부터 출발한 것으로 친다 (시연 영상 장면용, 기본 0)
+        val startM = if (intent.hasExtra("demoStartM")) intent.getIntExtra("demoStartM", 0) else 0
+        if (intent.hasExtra("demo")) navi.setDemo(intent.getBooleanExtra("demo", false), route, startM)
         intent.getStringExtra("ask")?.let { session.onQuestionText(it) }
     }
 

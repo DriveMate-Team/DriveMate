@@ -115,10 +115,10 @@ fun PrepScreen(onBack: () -> Unit, viewModel: PrepViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (!navi.hasRoute) DmButton("내비 열기", viewModel::openNavi, primary = false)
-                // 시연·테스트용 가짜 경로 (디버그 빌드에서만 보인다)
+                // 시뮬레이션 주행: 실제 내비 로그에서 옮긴 경로를 차량 속도로 따라간다 (시연·테스트용, 디버그 빌드에서만 보인다)
                 if (BuildConfig.DEBUG) {
                     DmButton(
-                        if (demo) "데모 경로 끄기" else "데모 경로 쓰기",
+                        if (demo) "시뮬레이션 끄기" else "시뮬레이션 주행",
                         { viewModel.setDemo(!demo) }, primary = false,
                     )
                 }

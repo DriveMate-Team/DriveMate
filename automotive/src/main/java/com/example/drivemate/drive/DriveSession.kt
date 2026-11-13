@@ -139,8 +139,8 @@ class DriveSession @Inject constructor(
             _state.value = DriveState(
                 active = true, mode = mode, topics = topics,
                 hasRoute = naviNow.hasRoute, next = naviNow.next.takeIf { naviNow.hasRoute },
-                bubble = defaultBubble(naviNow.hasRoute),
-            )
+            ).let { it.copy(bubble = defaultBubble(it)) }
+            showingDefault = true
             starting = false
             Log.i(TAG, "TRIP START id=$tripId mode=$mode topics=$topics route=${naviNow.hasRoute}")
             startTicker()
@@ -199,12 +199,14 @@ class DriveSession @Inject constructor(
         when (_state.value.listen) {
             ListenState.LISTENING -> {
                 speechIn.cancel()
-                _state.update { it.copy(listen = ListenState.IDLE, bubble = if (it.active) defaultBubble(it.hasRoute) else "") }
+                showingDefault = _state.value.active
+                _state.update { it.copy(listen = ListenState.IDLE, bubble = if (it.active) defaultBubble(it) else "") }
             }
             ListenState.ANSWERING -> Unit   // 답하는 중에는 무시
             ListenState.IDLE -> {
                 speechOut.stop()   // 코칭을 말하던 중이면 멈추고 듣는다
                 // 화면이 바로 반응하도록 먼저 상태를 바꾼다 (Pleos 가이드: 입력 후 0.25초 안에 응답 표시)
+                showingDefault = false
                 _state.update { it.copy(listen = ListenState.LISTENING, bubble = "듣고 있어요. 말씀해 주세요.") }
                 bubbleManeuverId = null
                 speechIn.listen { text ->
@@ -263,6 +265,7 @@ class DriveSession @Inject constructor(
         }
         Log.i(TAG, "QUESTION: $text -> $reply")
         bubbleManeuverId = null
+        showingDefault = false
         _state.update { it.copy(listen = ListenState.ANSWERING, bubble = bubble) }
         val spoke = speechOut.speak(reply) {
             _state.update { it.copy(listen = ListenState.IDLE) }
@@ -315,7 +318,11 @@ class DriveSession @Inject constructor(
         // 말풍선의 회전을 지나갔으면 기본 문구로 되돌린다
         if (bubbleManeuverId != null && next?.id != bubbleManeuverId && _state.value.listen == ListenState.IDLE) {
             bubbleManeuverId = null
-            _state.update { it.copy(bubble = defaultBubble(it.hasRoute)) }
+            showingDefault = true
+        }
+        // 코칭 대기 문구는 다음 회전·거리에 맞춰 바꾼다
+        if (showingDefault && _state.value.listen == ListenState.IDLE) {
+            _state.update { it.copy(bubble = defaultBubble(it)) }
         }
     }
 
@@ -333,6 +340,7 @@ class DriveSession @Inject constructor(
         if (speechOut.speak(coaching.speech)) {
             pending = null
             bubbleManeuverId = pendingManeuverId
+            showingDefault = false
             _state.update { it.copy(bubble = coaching.bubble) }
         }
     }
@@ -408,8 +416,19 @@ class DriveSession @Inject constructor(
         scope.launch { repo.addEvent(event) }
     }
 
-    private fun defaultBubble(hasRoute: Boolean) =
-        if (hasRoute) "옆에서 같이 가고 있어요." else "경로가 없어서 기록과 질문만 도와드려요."
+    /**
+     * 코칭 대기 말풍선 (화면에만 띄우고 소리 내서 읽지 않는다).
+     * 다음에 안내할 회전이 있으면 언제 다시 알려줄지, 없거나 목적지가 없으면 편하게 가라고 말한다.
+     */
+    private fun defaultBubble(s: DriveState): String {
+        val next = s.next
+        return if (next != null && rules.willAnnounce(next, s.mode, s.topics))
+            "${next.type.label} ${CoachingRules.announceDistance(next.type)}m 전에 다시 알려드릴게요."
+        else "지금은 편하게 직진하세요."
+    }
+
+    // 말풍선이 지금 코칭 대기 문구인지 (그렇다면 내비 값이 바뀔 때마다 새로 계산한다)
+    private var showingDefault = false
 
     private companion object {
         const val TAG = "DriveMate"

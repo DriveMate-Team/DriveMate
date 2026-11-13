@@ -42,6 +42,11 @@ class CoachingRules {
         return coaching
     }
 
+    /** 이 회전 지점을 아직 멀어서 나중에 안내할 예정인지 (코칭 대기 말풍선 문구에 쓴다) */
+    fun willAnnounce(next: Maneuver, mode: DriveMode, topics: Set<Topic>): Boolean =
+        next.id !in announced && next.distanceM > announceDistance(next.type) &&
+            isWanted(next.type, mode, topics) && messageFor(next.type, mode) != null
+
     /** 새 주행을 시작할 때 기억을 지운다 */
     fun reset() {
         announced.clear()

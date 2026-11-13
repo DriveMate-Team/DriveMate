@@ -181,7 +181,7 @@ private fun ControlPanel(state: DriveState, onMic: () -> Unit, onEnd: () -> Unit
             text = when (state.listen) {
                 ListenState.LISTENING -> "듣는 중 · 다시 누르면 취소"
                 ListenState.ANSWERING -> "답하는 중"
-                ListenState.IDLE -> "눌러서 질문하기"
+                ListenState.IDLE -> "말로 질문하기"
             },
             style = DmType.body,
             color = if (listening) colors.accentText else colors.text,

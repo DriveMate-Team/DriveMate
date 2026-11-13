@@ -317,8 +317,8 @@ class ScenarioNaviSource @Inject constructor(
 
 /** 데모 경로 목록 */
 enum class DemoRoute(val destination: String) {
-    EMART("이마트 성남점 (데모 경로)"),
-    AIRPORT("김포공항 고속도로 진입 (데모 경로)");
+    EMART("이마트 성남점"),
+    AIRPORT("김포공항");
 
     val points: List<Pair<Int, ManeuverType>>
         get() = if (this == AIRPORT) ScenarioNaviSource.AIRPORT_ROUTE else ScenarioNaviSource.ROUTE

@@ -79,9 +79,10 @@ async function drive(n) {
     const want = (SIGNALS.find(([a, b]) => dist >= a && dist < b) || [0, 0, 'Off'])[2];
     if (want !== mode) { mode = want; await signal(mode); console.log(`  [${Math.round(dist)}m] 깜빡이 ${mode}`); }
   }
-  // 천천히 멈추고 주차 (1초에 5km씩)
+  // 천천히 멈추고 주차: 1km씩 0.25초마다 (초당 약 4km 감속).
+  // 에뮬레이터 속도는 한 번에 바뀌어서, 5km씩 내리면 앱이 짧은 간격으로 재면 급감속(초당 7.5km 이상)으로 잡힌다
   await signal('Off');
-  while (cur > 0) { cur = Math.max(0, cur - 5); await speed(cur); await sleep(1000); }
+  while (cur > 0) { cur = Math.max(0, cur - 1); await speed(cur); await sleep(250); }
   for (let i = 0; i < 50 && Number((await state()).controls.speed_kph) >= 1; i++) await sleep(200);
   await gear('Park');
   await sleep(6000);

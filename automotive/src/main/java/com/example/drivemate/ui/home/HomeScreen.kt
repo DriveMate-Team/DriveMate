@@ -74,14 +74,15 @@ class HomeViewModel @Inject constructor(repo: DriveRepository) : ViewModel() {
     val ui: StateFlow<HomeUi> =
         combine(repo.observeProfile(), repo.observeFinishedTrips(), repo.observeAllEvents()) { profile, trips, events ->
             val topics = profile.topics.toTopics().toLabel()
+            val roadmap = RoadmapBuilder.build(trips, events)
             HomeUi(
-                // 인사말: 지난 리포트의 목표가 있으면 그것을, 없으면 고른 연습 주제를 말한다
-                greeting = if (profile.goalTitle != null) "오늘도 같이 연습해 볼까요?"
-                else "오늘은 $topics${ReportBuilder.josa(topics, "을", "를")} 연습해 볼까요?",
+                // 인사말: 로드맵의 "지금 연습 중" 단계를 말한다 (바로 아래 로드맵과 같은 단계). 다 끝냈으면 일반 인사
+                greeting = roadmap.current?.label?.let { "오늘은 $it${ReportBuilder.josa(it, "을", "를")} 연습해 볼까요?" }
+                    ?: "오늘도 같이 연습해 볼까요?",
                 goalTitle = profile.goalTitle ?: "$topics 연습",
                 goalDetail = profile.goalDetail ?: "첫 주행이에요. 편하게 달려 보세요.",
                 lastTrip = trips.firstOrNull()?.let { summarize(it, events) },
-                roadmap = RoadmapBuilder.build(trips, events),
+                roadmap = roadmap,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUi())
 }

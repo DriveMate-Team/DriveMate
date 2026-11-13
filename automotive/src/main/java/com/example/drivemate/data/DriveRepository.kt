@@ -1,6 +1,7 @@
 package com.example.drivemate.data
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,6 +24,15 @@ class DriveRepository @Inject constructor(private val dao: DriveDao) {
 
     /** 주행 하나 삭제 (그 주행의 이벤트·질문도 함께 지워진다) */
     suspend fun deleteTrip(id: Long) = dao.deleteTrip(id)
+
+    /**
+     * 연수 로드맵의 "지금 연습 중" 단계 (null = 네 단계를 모두 끝냄).
+     * @param upToStartTime 이 시각까지 시작한 주행만 본다 (지난 리포트를 열 때 그때의 단계를 쓰려고)
+     */
+    suspend fun currentStage(upToStartTime: Long = Long.MAX_VALUE): com.example.drivemate.report.Stage? {
+        val trips = observeFinishedTrips().first().filter { it.startTime <= upToStartTime }
+        return com.example.drivemate.report.RoadmapBuilder.build(trips, observeAllEvents().first()).current
+    }
 
     /** 전체 삭제: 모든 주행 기록과 학습 정보(다음 목표)를 지운다 */
     suspend fun deleteEverything() {

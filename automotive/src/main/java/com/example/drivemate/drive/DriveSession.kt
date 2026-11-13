@@ -174,7 +174,8 @@ class DriveSession @Inject constructor(
             }
             repo.updateTrip(trip.copy(endTime = System.currentTimeMillis(), distanceM = distanceM.toInt()))
             // 리포트의 "다음 목표 1개"를 저장해 두었다가 다음 주행의 홈 화면에 보여준다
-            val report = ReportBuilder.build(events, questions)
+            // 이번 주행까지 넣어 계산한 로드맵의 지금 단계 (기록에 고칠 점이 없으면 이것이 다음 목표가 된다)
+            val report = ReportBuilder.build(events, questions, repo.currentStage())
             // 단, 아주 짧고 기록도 없는 주행은 지난 목표를 그대로 둔다 (300m 달리고 "코칭을 줄여 보자"는 섣부르다)
             val tooShortToJudge = distanceM < MIN_GOAL_TRIP_M && events.isEmpty() && questions.isEmpty()
             if (!tooShortToJudge) {
@@ -227,7 +228,7 @@ class DriveSession @Inject constructor(
         scope.launch {
             // 답할 때 쓸 주행: 주행 중이면 지금 주행, 아니면 리포트의 주행 또는 가장 최근에 끝난 주행
             val id = if (live) tripId else (questionTripId ?: repo.latestFinishedTripId())
-            val ctx = id?.let { TripContext(repo.getEvents(it), repo.getQuestions(it), live) }
+            val ctx = id?.let { TripContext(repo.getEvents(it), repo.getQuestions(it), live, repo.currentStage()) }
             answerQuestion(text, id, ctx, live)
         }
     }

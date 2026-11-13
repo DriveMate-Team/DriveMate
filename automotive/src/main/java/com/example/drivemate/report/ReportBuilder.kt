@@ -29,13 +29,25 @@ data class Report(val cards: List<ReportCard>, val goal: Goal)
  */
 object ReportBuilder {
 
+    /** 로드맵 단계별 연습 목표 문구 (기록에 고칠 점이 없을 때 쓴다) */
+    fun stageGoal(stage: Stage): String = when (stage) {
+        Stage.LEFT_TURN -> "좌회전 전 깜빡이 미리 켜기"
+        Stage.RIGHT_TURN -> "우회전 전 깜빡이 미리 켜기"
+        Stage.INTERSECTION -> "교차로 앞에서 속도 미리 줄이기"
+        Stage.MERGE -> "고속도로 합류 전 속도 맞추기"
+    }
+
     private const val GOAL_MIN_COUNT = 2   // 2번 이상이면 "다음 목표" 후보가 된다 (설계문서 표)
     private const val MAX_CARDS = 3        // 처방 카드는 1~3장
 
     // 목표 후보: 카드 + 횟수 + 그 카드가 목표가 됐을 때의 문구
     private data class Candidate(val card: ReportCard, val count: Int, val goal: Goal)
 
-    fun build(events: List<EventEntity>, questions: List<QuestionEntity>): Report {
+    /**
+     * @param nextStage 연수 로드맵의 "지금 연습 중" 단계. 기록에 고칠 점이 없을 때 이 단계를 다음 목표로 삼는다.
+     *                  null이면 네 단계를 모두 끝낸 것으로 보고 "코칭을 조금 줄여 보기"를 목표로 한다.
+     */
+    fun build(events: List<EventEntity>, questions: List<QuestionEntity>, nextStage: Stage? = null): Report {
         val candidates = listOfNotNull(signalRule(events), brakeRule(events), accelRule(events))
         val otherCard = otherEventsRule(events)
         val questionTopic = questions.firstNotNullOfOrNull { it.topic }
@@ -43,17 +55,14 @@ object ReportBuilder {
 
         val cards = (candidates.map { it.card } + listOfNotNull(otherCard, questionCard)).take(MAX_CARDS)
 
-        // 아무것도 없는 주행: 코칭 줄이기를 제안한다
+        // 아무것도 없는 주행: 로드맵의 지금 단계를 다음 목표로 한다. 네 단계를 다 끝냈으면 코칭 줄이기를 제안한다
         if (cards.isEmpty()) {
+            val title = nextStage?.let { stageGoal(it) } ?: "코칭을 조금 줄여 보기"
+            val tip = if (nextStage == null) "다음엔 코칭을 조금 줄여 볼까요?"
+            else "다음엔 $title${josa(title, "을", "를")} 연습해 볼까요?"
             return Report(
-                cards = listOf(
-                    ReportCard(
-                        CardKind.CLEAN,
-                        "오늘은 기록된 급가속·급감속이 없어요",
-                        "다음엔 코칭을 조금 줄여 볼까요?",
-                    )
-                ),
-                goal = Goal("코칭을 조금 줄여 보기", "기록된 급가속·급감속이 없었어요"),
+                cards = listOf(ReportCard(CardKind.CLEAN, "오늘은 기록된 급가속·급감속이 없어요", tip)),
+                goal = Goal(title, "기록된 급가속·급감속이 없었어요"),
             )
         }
 

@@ -18,6 +18,7 @@ import com.example.drivemate.model.Topic
 import com.example.drivemate.model.TurnSignal
 import com.example.drivemate.report.CardKind
 import com.example.drivemate.report.ReportBuilder
+import com.example.drivemate.report.Stage
 import com.example.drivemate.report.TripComparison
 import com.example.drivemate.report.Trend
 import com.example.drivemate.ui.theme.DarkColors
@@ -236,6 +237,14 @@ class ReportBuilderTest {
         val report = ReportBuilder.build(listOf(turn("RIGHT", true)), listOf(question(null)))
         assertEquals("오늘은 기록된 급가속·급감속이 없어요", report.cards.single().fact)
         assertEquals("다음엔 코칭을 조금 줄여 볼까요?", report.cards.single().tip)
+    }
+
+    @Test fun `고칠 점이 없으면 로드맵의 지금 단계가 다음 목표가 된다`() {
+        val report = ReportBuilder.build(emptyList(), emptyList(), Stage.INTERSECTION)
+        assertEquals("교차로 앞에서 속도 미리 줄이기", report.goal.title)
+        assertEquals("기록된 급가속·급감속이 없었어요", report.goal.detail)
+        // 네 단계를 다 끝냈을 때만 코칭 줄이기
+        assertEquals("코칭을 조금 줄여 보기", ReportBuilder.build(emptyList(), emptyList(), null).goal.title)
     }
 
     @Test fun `규칙에 없는 급감속이 있으면 없다고 말하지 않는다`() {

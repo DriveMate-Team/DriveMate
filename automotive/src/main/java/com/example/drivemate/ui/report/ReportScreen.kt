@@ -102,7 +102,7 @@ class ReportViewModel @Inject constructor(
     val ui: StateFlow<ReportUi> =
         combine(repo.observeTrip(tripId), repo.observeEvents(tripId), repo.observeQuestions(tripId)) { trip, events, questions ->
             if (trip == null) return@combine ReportUi()
-            val report = ReportBuilder.build(events, questions)
+            val report = ReportBuilder.build(events, questions, repo.currentStage(trip.startTime))
             // 이전 주행 대비 변화 (신청서 3-④)
             val previous = repo.getPreviousTrip(trip.startTime)
             val compare = previous?.let { TripComparison.compare(repo.getEvents(it.id), events) }.orEmpty()

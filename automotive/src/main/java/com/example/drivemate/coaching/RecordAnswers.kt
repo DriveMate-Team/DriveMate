@@ -1,5 +1,6 @@
 package com.example.drivemate.coaching
 
+import com.example.drivemate.report.Stage
 import com.example.drivemate.data.EventEntity
 import com.example.drivemate.data.QuestionEntity
 import com.example.drivemate.model.EventType
@@ -14,6 +15,7 @@ data class TripContext(
     val events: List<EventEntity>,
     val questions: List<QuestionEntity>,
     val live: Boolean,
+    val nextStage: Stage? = null, // 연수 로드맵의 지금 단계 (다음 목표 답에 쓴다)
 )
 
 /**
@@ -80,7 +82,7 @@ object RecordAnswers {
 
     private fun weaknessAnswer(ctx: TripContext?): String {
         noRecord(ctx)?.let { return it }
-        val report = ReportBuilder.build(ctx!!.events, ctx.questions)
+        val report = ReportBuilder.build(ctx!!.events, ctx.questions, ctx.nextStage)
         val card = report.cards.first()
         val prefix = if (ctx.live) "지금까지 " else "이번 주행에서 "
         return if (card.kind == CardKind.CLEAN) {
@@ -92,7 +94,7 @@ object RecordAnswers {
 
     private fun nextPracticeAnswer(ctx: TripContext?): String {
         noRecord(ctx)?.let { return it }
-        val report = ReportBuilder.build(ctx!!.events, ctx.questions)
+        val report = ReportBuilder.build(ctx!!.events, ctx.questions, ctx.nextStage)
         val parts = mutableListOf("다음엔 ${report.goal.title}${ReportBuilder.josa(report.goal.title, "을", "를")} 연습해 봐요.")
         // 이번 주행에서 질문했던 주제와 "어려웠다"고 표시한 곳도 함께 알려준다 (신청서 4-⑤)
         val asked = ctx.questions.mapNotNull { it.topic }.distinct().filter { it !in report.goal.title }

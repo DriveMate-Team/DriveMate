@@ -10,7 +10,7 @@
  *   node tools/scene.js 5        리포트 화면 그대로 (질문할 시간 20초). 장면 4 바로 뒤에 찍는다
  *   node tools/scene.js 6        홈 화면으로. 장면 5 뒤에 찍는다
  *
- * 녹화: 장면마다 "준비 끝"이 나오면 Win+Alt+R로 직접 녹화를 켜고 엔터, 끝나면 Win+Alt+R로 끈다.
+ * 녹화: 장면마다 "준비 끝"이 나오면 캡처 도구(Win+Shift+R)로 녹화를 시작한 뒤 엔터, 끝나면 캡처 도구의 정지 버튼으로 끈다.
  *       (스크립트가 보낸 키는 Game Bar가 받지 않아서 자동으로 하지 못한다)
  *
  * 기록이 꼬이지 않게: 장면 1~4는 시작할 때 앱 기록을 "기준 기록"으로 되돌린다.
@@ -134,20 +134,30 @@ async function goDriving() {
 }
 let recStart = 0; // 녹화 시작 시각 (장면 길이 재기용)
 // 엔터를 기다린다 (녹화 키는 직접 누른다: 스크립트가 보낸 Win+Alt+R은 Game Bar가 받지 않았다, 2026-11-14 확인)
+// SCENE_AUTO=1 이면 엔터를 기다리지 않는다 (녹화를 미리 켜 두고 Claude가 대신 실행할 때)
 function waitEnter(msg) {
   process.stdout.write(msg);
+  if (process.env.SCENE_AUTO) { process.stdout.write('(자동 진행)\n'); return Promise.resolve(); }
   return new Promise((r) => process.stdin.once('data', () => { process.stdin.pause(); r(); }));
 }
 async function ready() {
   await ensureSplit();
-  await waitEnter('  준비 끝. 에뮬레이터 창을 누르고 Win+Alt+R로 녹화를 시작한 뒤, 여기서 엔터를 누르세요. ');
+  await waitEnter('  준비 끝. 에뮬레이터 창을 누르고 캡처 도구(Win+Shift+R)로 녹화를 시작한 뒤 엔터를 누르세요. ');
+  recStart = Date.now();   // 엔터를 누른 순간 = 녹화 시작 직후로 본다 (질문 시각은 여기부터 잰다)
   await countdown(3, '시작까지');
-  recStart = Date.now();
 }
-// 질문 장면: 마이크는 Game Bar(Win+Alt+M)로 직접 켠다
-async function askTime(sec) {
-  say('  ★ Win+Alt+M으로 Game Bar 마이크를 켜고, 앱의 마이크 버튼을 누른 뒤 지금 말하세요.');
-  await countdown(sec, '질문 시간');
+// 질문 장면: 마이크는 쓰지 않는다 (질문 목소리는 나중에 AI 음성으로 영상에 넣는다).
+// "듣는 중" 화면을 2.5초 보여 준 뒤, 질문 문장을 인식된 문장처럼 앱에 직접 넣는다. (디버그 빌드에서만 동작)
+// 문장을 넣은 시각(녹화 시작 후 몇 초)을 출력한다 → AI 음성을 그 시각에 맞춰 넣으면 된다.
+const sec = () => ((Date.now() - recStart) / 1000).toFixed(1);
+async function ask(question, answerSec) {
+  launch(['--ez', 'listenShow', 'true']);
+  say(`  ● ${sec()}초: "듣는 중" 화면 표시`);
+  await sleep(2500);
+  // adb shell은 인자를 이어 붙여 기기 셸로 넘기므로, 띄어쓰기·물음표가 있는 문장은 작은따옴표로 감싼다
+  launch(['--es', 'ask', `'${question.replace(/'/g, '')}'`]);
+  say(`  ★ ${sec()}초: 질문 넣음 → "${question}"  (AI 음성은 이 시각보다 조금 앞에서 끝나게 넣으세요)`);
+  await countdown(answerSec, '답변 시간');
 }
 
 // ---------- 장면 ----------
@@ -183,7 +193,8 @@ const scenes = {
     await goDriving();
     await ready();
     await ramp(40, 10, 1000);
-    await askTime(20);
+    await sleep(2000);
+    await ask('비보호 좌회전은 언제 해?', 15);
   },
   // 4. 교차로 210m 전 → 코칭(200m) → 천천히 멈춤 → P → 리포트
   async 4() {
@@ -203,7 +214,8 @@ const scenes = {
     launch();
     await sleep(1000);
     await ready();
-    await askTime(20);
+    await sleep(3000);                 // 리포트 화면을 먼저 보여 준다
+    await ask('오늘 부족했던 점은 뭐야?', 15);
   },
   // 6. 홈 화면 (장면 5 뒤)
   async 6() {
@@ -222,7 +234,7 @@ async function main() {
   try {
     say(`=== 장면 ${arg} ===`);
     await scene();
-    say('  ■ Win+Alt+R로 녹화를 멈추세요. (동영상\캡처 폴더에 저장돼요. 질문 장면이면 Win+Alt+M으로 마이크도 끄세요)');
+    say('  ■ 캡처 도구의 정지 버튼으로 녹화를 멈추세요.');
     say(`=== 장면 ${arg} 끝 (녹화 구간 약 ${Math.round((Date.now() - recStart) / 1000)}초) ===`);
   } finally {
     stop();

@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
      * 테스트 자동화용 (디버그 빌드에서만 동작). 에뮬레이터에서 마이크 없이 질문 답변을 확인할 때 쓴다.
      *   adb shell am start -n com.example.drivemate/.MainActivity --ez demo true      데모 경로 켜기
      *   adb shell am start -n com.example.drivemate/.MainActivity --es ask "비보호"     질문 문장 넣기
+     *   adb shell am start -n com.example.drivemate/.MainActivity --ez listenShow true  "듣는 중" 화면만 (영상용)
      */
     private fun handleDebugIntent(intent: Intent?) {
         if (!BuildConfig.DEBUG || intent == null) return
@@ -70,6 +71,8 @@ class MainActivity : ComponentActivity() {
         // --ei demoStartM 81 : 경로의 81m 지점부터 출발한 것으로 친다 (시연 영상 장면용, 기본 0)
         val startM = if (intent.hasExtra("demoStartM")) intent.getIntExtra("demoStartM", 0) else 0
         if (intent.hasExtra("demo")) navi.setDemo(intent.getBooleanExtra("demo", false), route, startM)
+        // --ez listenShow true : 마이크는 켜지 않고 "듣는 중" 화면만 보여 준다 (영상 촬영용. 이어서 ask로 문장을 넣는다)
+        if (intent.getBooleanExtra("listenShow", false)) session.showListeningOnly()
         intent.getStringExtra("ask")?.let { session.onQuestionText(it) }
     }
 

@@ -221,6 +221,18 @@ class DriveSession @Inject constructor(
         }
     }
 
+    /**
+     * 영상 촬영용 (디버그 빌드에서만 MainActivity가 부른다): 마이크를 실제로 켜지 않고 "듣는 중" 화면만 보여 준다.
+     * 이어서 onQuestionText(문장)를 부르면 인식된 문장처럼 답한다.
+     */
+    fun showListeningOnly() {
+        if (_state.value.listen != ListenState.IDLE) return
+        speechOut.stop()
+        showingDefault = false
+        bubbleManeuverId = null
+        _state.update { it.copy(listen = ListenState.LISTENING, bubble = "듣고 있어요. 말씀해 주세요.") }
+    }
+
     // 주차 후 질문이 어느 주행에 대한 것인지 (리포트 화면에서 넘겨받음). 주행 중이면 null
     private var questionTripId: Long? = null
 

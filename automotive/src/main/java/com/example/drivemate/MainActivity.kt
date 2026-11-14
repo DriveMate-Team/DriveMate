@@ -44,6 +44,8 @@ class MainActivity : ComponentActivity() {
 
         val missing = RUNTIME_PERMISSIONS.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isEmpty()) startSources() else permissionLauncher.launch(missing.toTypedArray())
+        // 디버그 빌드: 앱이 시작할 때 연습 경로(가짜 내비 경로)를 자동으로 쓴다. 화면에는 버튼이 없다 (영상에서 실제 앱처럼 보이게)
+        if (BuildConfig.DEBUG && !navi.demo.value) navi.setDemo(true)
         handleDebugIntent(intent)
     }
 

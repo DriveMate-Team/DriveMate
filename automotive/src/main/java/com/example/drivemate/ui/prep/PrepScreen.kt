@@ -87,7 +87,6 @@ class PrepViewModel @Inject constructor(
 @Composable
 fun PrepScreen(onBack: () -> Unit, viewModel: PrepViewModel = hiltViewModel()) {
     val navi by viewModel.naviState.collectAsStateWithLifecycle()
-    val demo by viewModel.demo.collectAsStateWithLifecycle()
     val mode by viewModel.mode.collectAsStateWithLifecycle()
     val topics by viewModel.topics.collectAsStateWithLifecycle()
     val colors = DmTheme.colors
@@ -115,13 +114,7 @@ fun PrepScreen(onBack: () -> Unit, viewModel: PrepViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (!navi.hasRoute) DmButton("내비 열기", viewModel::openNavi, primary = false)
-                // 시뮬레이션 주행: 실제 내비 로그에서 옮긴 경로를 차량 속도로 따라간다 (시연·테스트용, 디버그 빌드에서만 보인다)
-                if (BuildConfig.DEBUG) {
-                    DmButton(
-                        if (demo) "시뮬레이션 끄기" else "시뮬레이션 주행",
-                        { viewModel.setDemo(!demo) }, primary = false,
-                    )
-                }
+                // 연습 경로 버튼은 없앴다: 디버그 빌드는 앱이 시작할 때 자동으로 연습 경로를 쓴다 (MainActivity)
             }
         }
 

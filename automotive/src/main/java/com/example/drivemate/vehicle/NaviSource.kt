@@ -317,6 +317,16 @@ class ScenarioNaviSource @Inject constructor(
             400 to TurnType.TURN_ARRIVE,
         )
 
+        /**
+         * 시연 영상 "전체" 촬영용 경로 (node tools/scene.js all): 좌회전 400m → 직진 550m 뒤 교차로 → 250m 뒤 도착.
+         * 좌회전 코칭 → 직진 구간 질문 → 교차로 코칭을 2~3분 안에 이어서 보여 줄 수 있는 길이.
+         */
+        private val FULL_LEGS = listOf(
+            400 to TurnType.TURN_LEFT,
+            550 to TurnType.TURN_STRAIGHT,
+            250 to TurnType.TURN_ARRIVE,
+        )
+
         /** 앞 지점부터의 거리 목록을 "출발점부터의 누적 거리"로 바꾼다 */
         fun cumulative(legs: List<Pair<Int, TurnType>>): List<Pair<Int, ManeuverType>> = legs
             .runningFold(0 to ManeuverType.OTHER) { acc, (leg, turn) -> (acc.first + leg) to turn.toManeuverType() }
@@ -326,6 +336,7 @@ class ScenarioNaviSource @Inject constructor(
         val ROUTE: List<Pair<Int, ManeuverType>> = cumulative(REAL_LEGS)
         val AIRPORT_ROUTE: List<Pair<Int, ManeuverType>> = cumulative(AIRPORT_LEGS)
         val CROSS_ROUTE: List<Pair<Int, ManeuverType>> = cumulative(CROSS_LEGS)
+        val FULL_ROUTE: List<Pair<Int, ManeuverType>> = cumulative(FULL_LEGS)
     }
 }
 
@@ -333,10 +344,12 @@ class ScenarioNaviSource @Inject constructor(
 enum class DemoRoute(val destination: String) {
     EMART("이마트 성남점"),
     AIRPORT("김포공항"),
-    CROSS("이마트 성남점");   // 시연 영상 장면 4 전용 (교차로 지점)
+    CROSS("이마트 성남점"),   // 시연 영상 장면 4 전용 (교차로 지점)
+    FULL("이마트 성남점");    // 시연 영상 전체 촬영용 (좌회전 → 직진 → 교차로)
 
     val points: List<Pair<Int, ManeuverType>>
         get() = when (this) {
+            FULL -> ScenarioNaviSource.FULL_ROUTE
             AIRPORT -> ScenarioNaviSource.AIRPORT_ROUTE
             CROSS -> ScenarioNaviSource.CROSS_ROUTE
             EMART -> ScenarioNaviSource.ROUTE

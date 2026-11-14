@@ -3,6 +3,7 @@
  * 시연 영상 장면별 실행기. 장면마다 30초 안에 끝난다.
  *
  *   node tools/scene.js save     지금 앱 기록을 "기준 기록"으로 저장 (처음 한 번. 영상용 기록을 만든 뒤에)
+ *   node tools/scene.js all      전체를 한 번에 이어서 (약 2분). 장면 시작·질문 시각을 출력한다
  *   node tools/scene.js 1        홈 → 주행 준비 → 출발
  *   node tools/scene.js 2        좌회전 약 390m 전에서 출발 → 코칭 음성 → 좌회전 지나감
  *   node tools/scene.js 3        직진 구간 주행 (질문할 시간 20초)
@@ -160,8 +161,64 @@ async function ask(question, answerSec) {
   await countdown(answerSec, '답변 시간');
 }
 
+// ---------- 전체 (한 번에 이어서 찍기) ----------
+// 장면이 시작되는 시각을 출력한다 (편집할 때 자르는 기준)
+const mark = (label) => say(`  ▶ ${sec()}초: ${label}`);
+// 앱 경로 FULL(NaviSource.FULL_LEGS): 좌회전 400m, 교차로 950m, 도착 1200m
+let dist = 0, lastT = 0;
+async function driveUntil(m, onTick) {
+  while (dist < m) {
+    await sleep(200);
+    const now = Date.now(); dist += cur / 3.6 * (now - lastT) / 1000; lastT = now;
+    if (onTick) await onTick();
+  }
+}
+async function all() {
+  await resetToBase('FULL', 0);        // 분할 확인·기록 초기화는 여기서 한 번만
+  await ready();
+  mark('1. 홈 (로드맵)');
+  await sleep(4000);
+  await tapText('주행 시작');
+  mark('2. 주행 준비'); await sleep(4000);
+  await tapText('출발하기'); await gear('Drive');
+  mark('3. 출발'); await sleep(3000);
+
+  // 좌회전: 60km/h까지 천천히 올린다. 코칭은 남은 300m(=100m 지점)에서, 깜빡이는 300m 지점부터
+  mark('4. 좌회전 코칭 구간');
+  dist = 0; lastT = Date.now();
+  let on = false, lastRamp = 0;
+  const rampTick = async () => {
+    if (cur < 60 && Date.now() - lastRamp >= 1000) { lastRamp = Date.now(); await speed(cur + 5); } // 1초에 5km/h (급가속 기록이 남지 않게)
+    if (!on && dist > 300) { on = true; await signal('BlinkLeft'); }
+  };
+  await driveUntil(440, rampTick);
+  await signal('Off');
+
+  // 직진 구간: 40km/h로 줄이고 질문 (다음 안내 = 교차로, 남은 200m에서 코칭)
+  await ramp(40, 1, 150);
+  mark('5. 직진 구간 질문');           // 감속·질문 동안 달린 거리는 다음 driveUntil이 한꺼번에 더한다
+  await ask('비보호 좌회전은 언제 해?', 13);
+  await driveUntil(950 - 210);         // 교차로 코칭(남은 200m) 바로 앞까지
+  mark('6. 교차로 코칭');
+  await driveUntil(950 - 150);         // 코칭을 들으며 60m 더
+  mark('7. 천천히 정차 → P');
+  await ramp(0, 1, 250);               // 초당 약 4km/h (급감속 기록 없음)
+  for (let i = 0; i < 25 && Number((await state()).controls.speed_kph) >= 1; i++) await sleep(200);
+  await sleep(500);
+  await gear('Park');
+  await sleep(6000);                   // "수고하셨어요" → 리포트 화면
+  mark('8. 리포트');
+  await sleep(3000);
+  mark('9. 리포트에서 질문');
+  await ask('오늘 부족했던 점은 뭐야?', 13);
+  await tapText('홈으로');
+  mark('10. 홈 (다음 목표)');
+  await sleep(6000);
+}
+
 // ---------- 장면 ----------
 const scenes = {
+  all,
   // 1. 홈 → 주행 준비 → 출발
   async 1() {
     await resetToBase('EMART', 81);
@@ -229,7 +286,7 @@ async function main() {
   const arg = process.argv[2];
   if (arg === 'save') return saveBase();
   const scene = scenes[arg];
-  if (!scene) { say('사용법: node tools/scene.js save | 1 | 2 | 3 | 4 | 5 | 6'); process.exit(1); }
+  if (!scene) { say('사용법: node tools/scene.js save | all | 1 | 2 | 3 | 4 | 5 | 6'); process.exit(1); }
   const stop = await heartbeat();
   try {
     say(`=== 장면 ${arg} ===`);

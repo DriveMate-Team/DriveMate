@@ -22,3 +22,6 @@ docs/
 CLAUDE.md
 tools/.scene_base/
 recordings/
+
+# 녹화 영상은 올리지 않는다
+*.mp4

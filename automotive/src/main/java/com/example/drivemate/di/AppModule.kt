@@ -56,6 +56,7 @@ object AppModule {
     fun database(@ApplicationContext context: Context): DriveDatabase =
         Room.databaseBuilder(context, DriveDatabase::class.java, "drivemate.db")
             // 표 구조가 바뀌면 예전 기록을 지우고 새로 만든다 (1차 시연 단계라 옮기기 코드는 만들지 않음, 팀 결정 2026-11-13)
+            .addMigrations(com.example.drivemate.data.MIGRATION_2_3)   // 2 -> 3은 칸 하나만 더해서 기록을 지키며 옮긴다
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 

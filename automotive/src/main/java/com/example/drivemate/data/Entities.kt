@@ -45,6 +45,7 @@ data class EventEntity(
     val direction: String? = null,    // 회전 이벤트일 때: "LEFT" / "RIGHT"
     val signalUsed: Boolean? = null,  // 회전 이벤트일 때: 100m 안에서 "회전 방향과 같은 쪽" 방향지시등 기록이 있었는지
     val signalSide: String? = null,   // 회전 이벤트일 때: 100m 안에서 켜진 쪽 "LEFT" / "RIGHT" / "LEFT,RIGHT" / "" (없음)
+    val signalDistM: Int? = null,     // 회전 이벤트일 때: 회전 방향 쪽 깜빡이를 처음 켠 순간 회전 지점까지 남은 거리(m)
     val nearTurn: Boolean? = null,    // 급감속일 때: 회전·교차로 100m 안이었는지
     val fromStop: Boolean? = null,    // 급가속일 때: 정차 후 출발 중이었는지
     val difficult: Boolean = false,   // 사용자가 "어려웠던 구간"으로 표시했는지

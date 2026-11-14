@@ -34,7 +34,16 @@ const adb = (args, opts = {}) => execFileSync('adb', args, { maxBuffer: 64 * 102
 const say = (m) => console.log(m);
 
 // ---------- Virtual Console ----------
-const put = async (p) => { const r = await fetch(BASE + p, { method: 'PUT' }); if (!r.ok) throw new Error(`PUT ${p} -> ${r.status}`); };
+// 화면 읽기(adb, 동기 실행) 동안에는 하트비트가 멈춰 콘솔이 503을 줄 수 있다 → 하트비트를 바로 보내고 다시 시도
+const put = async (p) => {
+  for (let i = 0; ; i++) {
+    const r = await fetch(BASE + p, { method: 'PUT' });
+    if (r.ok) return;
+    if (r.status !== 503 || i >= 4) throw new Error(`PUT ${p} -> ${r.status}`);
+    await fetch(`${BASE}/browser/session?client=scene`, { method: 'POST' }).catch(() => {});
+    await sleep(300);
+  }
+};
 const state = async () => (await fetch(BASE + '/vehicle/state', { cache: 'no-store' })).json();
 let cur = 0; // 지금 속도 (km/h)
 const speed = async (s) => { cur = s; await put(`/vehicle/controls?speed=${s}&accelerator=0&brake=0&steering=0`); };

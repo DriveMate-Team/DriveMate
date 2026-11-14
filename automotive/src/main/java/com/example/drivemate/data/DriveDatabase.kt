@@ -89,9 +89,16 @@ interface DriveDao {
 /** 데이터베이스 본체. 표가 바뀌면 version을 올려야 한다 */
 @Database(
     entities = [TripEntity::class, EventEntity::class, QuestionEntity::class, ProfileEntity::class],
-    version = 2,   // 2: 이벤트에 signalSide(방향지시등 좌우) 추가 (2026-11-13)
+    version = 3,   // 2: 이벤트에 signalSide(방향지시등 좌우) 추가 (2026-11-13) / 3: signalDistM(깜빡이 켠 거리) 추가 (2026-11-14)
     exportSchema = false,
 )
 abstract class DriveDatabase : RoomDatabase() {
     abstract fun dao(): DriveDao
+}
+
+/** 2 -> 3: 이벤트 표에 signalDistM 칸만 더한다 (기존 기록은 그대로 둔다. 영상용 기준 기록이 지워지지 않게) */
+val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE event ADD COLUMN signalDistM INTEGER")
+    }
 }

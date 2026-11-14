@@ -31,6 +31,7 @@ sealed interface DetectedEvent {
         val signalUsed: Boolean,
         val speedKmh: Float,
         val signalsSeen: Set<TurnSignal> = emptySet(),
+        val signalDistM: Int? = null,   // 회전 방향 쪽 깜빡이를 처음 켠 순간 회전 지점까지 남은 거리 (signalUsed일 때만)
     ) : DetectedEvent
 }
 
@@ -60,6 +61,7 @@ class EventDetector {
     private var trackedType = ManeuverType.OTHER
     private var cameWithinRange = false   // 100m 안까지 들어왔는지
     private val signalsSeen = mutableSetOf<TurnSignal>()   // 100m 안에서 켜진 방향지시등 쪽 (왼쪽/오른쪽)
+    private var signalOnDistM: Int? = null                 // 회전 방향 쪽 깜빡이를 처음 켠 순간 남은 거리
 
     /**
      * 약 1초마다 부른다.
@@ -76,7 +78,8 @@ class EventDetector {
             if (trackedId != null && cameWithinRange && trackedType.isTurn()) {
                 // 회전 방향과 같은 쪽 깜빡이를 켰을 때만 "작동 기록 있음"으로 본다 (2026-11-13: 좌우 구분 추가)
                 val correct = if (trackedType == ManeuverType.LEFT) TurnSignal.LEFT else TurnSignal.RIGHT
-                events += DetectedEvent.TurnPassed(trackedType, correct in signalsSeen, speedKmh, signalsSeen.toSet())
+                val used = correct in signalsSeen
+                events += DetectedEvent.TurnPassed(trackedType, used, speedKmh, signalsSeen.toSet(), if (used) signalOnDistM else null)
             }
             // 교차로·합류 지점도 100m 안까지 들어왔다가 바뀌면 "지나감"으로 기록한다
             if (trackedId != null && cameWithinRange &&
@@ -88,6 +91,12 @@ class EventDetector {
             trackedType = next?.type ?: ManeuverType.OTHER
             cameWithinRange = false
             signalsSeen.clear()
+            signalOnDistM = null
+        }
+        // 회전 방향 쪽 깜빡이를 처음 켠 순간의 남은 거리 (100m 밖에서 켰어도 잰다. 켠 채로 100m 안에 들어와야 "작동 기록"이 된다)
+        if (next != null && signalOnDistM == null && trackedType.isTurn()) {
+            val correct = if (trackedType == ManeuverType.LEFT) TurnSignal.LEFT else TurnSignal.RIGHT
+            if (correct in signals) signalOnDistM = next.distanceM
         }
         // 회전·교차로 100m 안인지 (톨게이트·터널 같은 그 밖의 안내는 세지 않는다)
         val nearManeuver = next != null && next.type != ManeuverType.OTHER && next.distanceM <= NEAR_TURN_M
@@ -150,6 +159,7 @@ class EventDetector {
         trackedId = null
         cameWithinRange = false
         signalsSeen.clear()
+        signalOnDistM = null
     }
 
     private fun ManeuverType.isTurn() = this == ManeuverType.LEFT || this == ManeuverType.RIGHT

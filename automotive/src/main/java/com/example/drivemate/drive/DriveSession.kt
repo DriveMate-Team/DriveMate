@@ -395,6 +395,7 @@ class DriveSession @Inject constructor(
                                 direction = if (event.type == ManeuverType.LEFT) "LEFT" else "RIGHT",
                                 signalUsed = event.signalUsed,
                                 signalSide = event.signalsSeen.joinToString(",") { it.name },
+                                signalDistM = event.signalDistM,
                             )
                     }
                 }
@@ -411,7 +412,7 @@ class DriveSession @Inject constructor(
     // 이벤트 한 건을 저장한다. 주행 중에는 "기록만" 하고 아무 말도 하지 않는다.
     private fun saveEvent(
         id: Long, type: EventType, speedKmh: Float,
-        direction: String? = null, signalUsed: Boolean? = null, signalSide: String? = null,
+        direction: String? = null, signalUsed: Boolean? = null, signalSide: String? = null, signalDistM: Int? = null,
         nearTurn: Boolean? = null, fromStop: Boolean? = null, difficult: Boolean = false,
     ) {
         val v = vehicle.state.value
@@ -421,10 +422,10 @@ class DriveSession @Inject constructor(
             latitude = place?.first, longitude = place?.second,
             type = type.name, speedKmh = speedKmh,
             turnSignal = v.turnSignal.name, brake = v.brake,
-            direction = direction, signalUsed = signalUsed, signalSide = signalSide, nearTurn = nearTurn, fromStop = fromStop,
+            direction = direction, signalUsed = signalUsed, signalSide = signalSide, signalDistM = signalDistM, nearTurn = nearTurn, fromStop = fromStop,
             difficult = difficult,
         )
-        Log.i(TAG, "EVENT: ${type.name} speed=$speedKmh direction=$direction signalUsed=$signalUsed signalSide=$signalSide nearTurn=$nearTurn fromStop=$fromStop")
+        Log.i(TAG, "EVENT: ${type.name} speed=$speedKmh direction=$direction signalUsed=$signalUsed signalSide=$signalSide signalDistM=$signalDistM nearTurn=$nearTurn fromStop=$fromStop")
         scope.launch { repo.addEvent(event) }
     }
 

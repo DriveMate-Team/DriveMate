@@ -139,7 +139,7 @@ class EventDetectorTest {
 
         d.onSample(36f, Maneuver(2, ManeuverType.LEFT, 80), setOf(TurnSignal.LEFT), 4000)     // 100m 안에서 켬
         val passed2 = d.onSample(36f, null, emptySet(), 5000)
-        assertEquals(listOf(DetectedEvent.TurnPassed(ManeuverType.LEFT, signalUsed = true, speedKmh = 36f, signalsSeen = setOf(TurnSignal.LEFT))), passed2)
+        assertEquals(listOf(DetectedEvent.TurnPassed(ManeuverType.LEFT, signalUsed = true, speedKmh = 36f, signalsSeen = setOf(TurnSignal.LEFT), signalDistM = 80)), passed2)
     }
 
     @Test fun `10초 안에 시속 5km 이상 변화가 방향을 바꿔 3번이면 불규칙한 속도 변화`() {
@@ -303,43 +303,87 @@ class AnswerEngineTest {
     }
 
     // ---------- 주행 기록 기반 질문 (신청서 3-③, 4-⑤) ----------
-    private fun turn(direction: String, used: Boolean, side: String, time: Long) = EventEntity(
+    private fun turn(direction: String, used: Boolean, side: String, time: Long, dist: Int? = null) = EventEntity(
         tripId = 1, time = time, type = EventType.TURN.name, speedKmh = 30f, turnSignal = "OFF", brake = false,
-        direction = direction, signalUsed = used, signalSide = side,
+        direction = direction, signalUsed = used, signalSide = side, signalDistM = dist,
     )
-    private fun ctx(vararg events: EventEntity, questions: List<QuestionEntity> = emptyList()) =
-        TripContext(events.toList(), questions, live = false)
+    private fun ctx(vararg events: EventEntity, questions: List<QuestionEntity> = emptyList(), stage: Stage? = null) =
+        TripContext(events.toList(), questions, live = false, nextStage = stage)
+    private fun ev(type: EventType, nearTurn: Boolean? = null, fromStop: Boolean? = null) = EventEntity(
+        tripId = 1, time = 1, type = type.name, speedKmh = 40f, turnSignal = "OFF", brake = false, nearTurn = nearTurn, fromStop = fromStop,
+    )
 
-    @Test fun `우회전 깜빡이 질문 - 작동 기록이 있으면 사실과 판단 불가를 함께 말한다`() {
-        val a = engine.answer("아까 우회전할 때 깜빡이 켰어", emptySet(), ctx(turn("RIGHT", true, "RIGHT", 10)))
+    @Test fun `깜빡이 질문 - 켠 거리가 30m 이상이면 여유 있게 켰다고 말한다`() {
+        val a = engine.answer("아까 우회전할 때 깜빡이 켰어", emptySet(), ctx(turn("RIGHT", true, "RIGHT", 10, dist = 80)))
         assertEquals(null, a.topic)   // 기록 질문은 "질문 주제"로 세지 않는다
-        assertEquals("가장 최근 우회전 구간에서 오른쪽 방향지시등이 작동한 기록이 있어요. ${RecordAnswers.CANNOT_JUDGE}", a.text)
+        assertEquals("네, 우회전 80미터 전에 오른쪽 깜빡이를 켜셨어요. 30미터 전 기준보다 여유 있게 잘 켜셨어요.", a.text)
     }
 
-    @Test fun `우회전 깜빡이 질문 - 가장 최근 우회전을 고르고 반대쪽이면 그렇게 말한다`() {
+    @Test fun `깜빡이 질문 - 30m보다 늦게 켰으면 조금 늦었다고 말한다`() {
+        assertEquals("네, 좌회전 20미터 전에 왼쪽 깜빡이를 켜셨어요. 조금 늦었어요. 다음엔 30미터 전에 켜 보세요.",
+            engine.answer("좌회전 깜빡이 켰어", emptySet(), ctx(turn("LEFT", true, "LEFT", 10, dist = 20))).text)
+    }
+
+    @Test fun `깜빡이 질문 - 거리가 없는 예전 기록은 거리 없이 말한다`() {
+        assertEquals("네, 우회전 전에 오른쪽 깜빡이를 켜셨어요. 다음에도 회전 30미터 전에는 꼭 켜 두세요.",
+            engine.answer("우회전 깜빡이 켰어", emptySet(), ctx(turn("RIGHT", true, "RIGHT", 10))).text)
+    }
+
+    @Test fun `깜빡이 질문 - 가장 최근 우회전을 고르고 반대쪽이면 그렇게 말한다`() {
         val a = engine.answer("우회전 깜빡이 켰어?", emptySet(), ctx(
             turn("RIGHT", true, "RIGHT", 10), turn("LEFT", false, "", 20), turn("RIGHT", false, "LEFT", 30),
         ))
-        assertTrue(a.text.startsWith("가장 최근 우회전 구간에서는 반대쪽 방향지시등 기록만 있어요."))
+        assertEquals("우회전할 때 반대쪽 깜빡이 기록이 있어요. 다음엔 오른쪽 깜빡이를 켜 보세요.", a.text)
     }
 
     @Test fun `깜빡이 질문 - 기록이 없으면 없다고 말한다`() {
+        assertEquals("우회전할 때 깜빡이 기록이 없었어요. 다음엔 회전 30미터 전에 켜 보세요.",
+            engine.answer("우회전 깜빡이 켰어", emptySet(), ctx(turn("RIGHT", false, "", 10))).text)
         assertEquals("이번 주행에는 우회전 기록이 없어요.", engine.answer("우회전할 때 깜빡이 켰어", emptySet(), ctx()).text)
         assertTrue(engine.answer("깜빡이 켰어", emptySet(), null).text.startsWith("아직 주행 기록이 없어요"))
     }
 
-    @Test fun `부족했던 점 질문 - 리포트 첫 카드의 사실 + 판단 불가`() {
-        val a = engine.answer("오늘 부족했던 점은 뭐야", emptySet(), ctx(turn("RIGHT", false, "", 10), turn("RIGHT", false, "", 20)))
-        assertEquals("이번 주행에서 우회전 2번 중 2번은 깜빡이 기록이 없었어요. ${RecordAnswers.CANNOT_JUDGE}", a.text)
+    @Test fun `기록 답변에는 판단 불가 문장과 겹치는 말이 없다`() {
+        val cases = listOf(
+            ctx(turn("RIGHT", false, "", 10), turn("RIGHT", false, "", 20)),
+            ctx(ev(EventType.HARD_BRAKE, nearTurn = true)),
+            ctx(turn("LEFT", true, "LEFT", 10, dist = 50)),
+            ctx(),
+        )
+        for (c in cases) for (q in listOf("오늘 부족했던 점은 뭐야", "어떤 부분을 더 연습하면 좋을까", "깜빡이 켰어")) {
+            val t = engine.answer(q, emptySet(), c).text
+            assertTrue(t, "판단할 수 없" !in t && "알 수 없" !in t && "이번 주행에서 오늘" !in t)
+            assertTrue(t, t.count { it == '.' } <= 2)
+        }
     }
 
-    @Test fun `더 연습할 부분 질문 - 다음 목표와 질문 주제, 어려웠던 곳을 함께 말한다`() {
-        val difficult = EventEntity(tripId = 1, time = 5, type = EventType.DIFFICULT.name, speedKmh = 20f, turnSignal = "OFF", brake = false, difficult = true)
+    @Test fun `부족했던 점 - 깜빡이 기록 없음`() {
+        val a = engine.answer("오늘 부족했던 점은 뭐야", emptySet(), ctx(turn("RIGHT", false, "", 10), turn("RIGHT", false, "", 20)))
+        assertEquals("우회전 2번 중 2번은 깜빡이 기록이 없었어요. 다음엔 회전 30미터 전에 켜 보세요.", a.text)
+    }
+
+    @Test fun `부족했던 점 - 회전·교차로 앞 급감속`() {
+        assertEquals("회전·교차로 앞에서 급감속이 2번 있었어요. 다음엔 안내를 들으면 미리 발을 떼 보세요.",
+            engine.answer("오늘 부족했던 점은 뭐야", emptySet(), ctx(ev(EventType.HARD_BRAKE, nearTurn = true), ev(EventType.HARD_BRAKE, nearTurn = true))).text)
+    }
+
+    @Test fun `부족했던 점 - 고칠 점이 없고 질문했으면 그 주제로`() {
+        val q = QuestionEntity(tripId = 1, time = 6, question = "비보호", answer = "", topic = "비보호 좌회전")
+        assertEquals("오늘은 급가속·급감속 없이 부드럽게 달렸어요. 비보호 좌회전이 궁금하셨으니, 다음엔 그 구간이 있는 길에서 연습해 봐요.",
+            engine.answer("오늘 부족했던 점은 뭐야", emptySet(), ctx(turn("LEFT", true, "LEFT", 10), questions = listOf(q))).text)
+    }
+
+    @Test fun `부족했던 점 - 고칠 점도 질문도 없으면 로드맵 지금 단계로`() {
+        assertEquals("오늘은 급가속·급감속 없이 부드럽게 달렸어요. 다음엔 교차로를 연습해 봐요.",
+            engine.answer("오늘 부족했던 점은 뭐야", emptySet(), ctx(stage = Stage.INTERSECTION)).text)
+    }
+
+    @Test fun `더 연습할 부분 - 사실과 다음 목표 두 문장`() {
         val q = QuestionEntity(tripId = 1, time = 6, question = "비보호", answer = "", topic = "비보호 좌회전")
         val a = engine.answer("오늘 내가 어떤 부분을 더 연습하면 좋을까", emptySet(), ctx(
-            turn("RIGHT", false, "", 10), turn("RIGHT", false, "", 20), difficult, questions = listOf(q),
+            turn("RIGHT", false, "", 10), turn("RIGHT", false, "", 20), questions = listOf(q),
         ))
-        assertEquals("다음엔 우회전 전 깜빡이 미리 켜기를 연습해 봐요. 오늘 물어본 비보호 좌회전도 함께 연습하면 좋아요. 어려웠다고 표시한 곳도 1곳 있어요.", a.text)
+        assertEquals("우회전 2번 중 2번은 깜빡이 기록이 없었어요. 다음엔 우회전 전 깜빡이 미리 켜기를 연습해 봐요.", a.text)
     }
 
     @Test fun `기록 질문이 아니면 기존 답변을 그대로 쓴다`() {

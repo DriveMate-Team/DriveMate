@@ -4,7 +4,6 @@ import com.example.drivemate.report.Stage
 import com.example.drivemate.data.EventEntity
 import com.example.drivemate.data.QuestionEntity
 import com.example.drivemate.model.EventType
-import com.example.drivemate.report.CardKind
 import com.example.drivemate.report.ReportBuilder
 
 /**
@@ -21,15 +20,21 @@ data class TripContext(
 /**
  * 주행 기록으로 답하는 질문들.
  *
- * 원칙 (신청서 4-④, 4-⑤): 기록된 "사실"만 말하고, 잘했는지·적절했는지는 판단하지 않는다.
- * 판단이 필요한 부분은 반드시 "기록만으로는 판단할 수 없어요"라고 덧붙인다.
+ * 답의 규칙 (2026-11-14):
+ *  1) "기록된 사실 -> 다음에 해볼 것" 순서로, 두 문장 안에서 말한다.
+ *  2) "기록만으로는 판단할 수 없어요"는 운전 동작이 적절했는지를 물을 때만 붙인다 (CANNOT_JUDGE).
+ *     질문 기록, 급가속·급감속 횟수, 깜빡이 기록에는 붙이지 않는다.
+ *  3) "이번 주행에서 오늘"처럼 겹치는 말을 쓰지 않는다.
  *
  * 안드로이드와 상관없는 순수한 계산이라 PC에서 단위 테스트로 확인할 수 있다.
  */
 object RecordAnswers {
 
-    /** 판단할 수 없을 때 덧붙이는 문장 (신청서 4-⑤ 문구를 따름) */
+    /** 운전 동작의 적절성을 물을 때만 덧붙이는 문장 */
     const val CANNOT_JUDGE = "다만 실제 도로 상황에 비춰 적절했는지는 기록만으로는 판단할 수 없어요."
+
+    /** 깜빡이를 켜 두라고 권하는 거리 (리포트 카드 "회전 지점 30미터 전"과 같은 값) */
+    const val SIGNAL_TIP_M = 30
 
     /** 이 질문이 주행 기록에 대한 질문이면 답을, 아니면 null을 돌려준다. q는 띄어쓰기를 없앤 질문 */
     fun answer(q: String, ctx: TripContext?): String? = when {
@@ -67,40 +72,95 @@ object RecordAnswers {
         val turn = ctx!!.events
             .filter { it.type == EventType.TURN.name && (want == null || it.direction == want) }
             .maxByOrNull { it.time }
-            ?: return "${if (ctx.live) "이번 주행에는 아직" else "이번 주행에는"} $name 기록이 없어요."
+            ?: return "${if (ctx.live) "아직" else "이번 주행에는"} $name 기록이 없어요."
 
         val turnName = if (turn.direction == "LEFT") "좌회전" else "우회전"
-        val sameSide = if (turn.direction == "LEFT") "왼쪽" else "오른쪽"
-        val seen = turn.signalSide.orEmpty()
-        val fact = when {
-            turn.signalUsed == true -> "가장 최근 $turnName 구간에서 $sameSide 방향지시등이 작동한 기록이 있어요."
-            seen.isNotBlank() -> "가장 최근 $turnName 구간에서는 반대쪽 방향지시등 기록만 있어요."
-            else -> "가장 최근 $turnName 구간 100미터 전부터는 방향지시등 기록이 없어요."
+        val side = if (turn.direction == "LEFT") "왼쪽" else "오른쪽"
+        val dist = turn.signalDistM
+        return when {
+            turn.signalUsed == true && dist != null && dist >= SIGNAL_TIP_M ->
+                "네, $turnName ${dist}미터 전에 $side 깜빡이를 켜셨어요. ${SIGNAL_TIP_M}미터 전 기준보다 여유 있게 잘 켜셨어요."
+            turn.signalUsed == true && dist != null ->
+                "네, $turnName ${dist}미터 전에 $side 깜빡이를 켜셨어요. 조금 늦었어요. 다음엔 ${SIGNAL_TIP_M}미터 전에 켜 보세요."
+            turn.signalUsed == true ->   // 거리를 저장하기 전의 기록
+                "네, $turnName 전에 $side 깜빡이를 켜셨어요. 다음에도 회전 ${SIGNAL_TIP_M}미터 전에는 꼭 켜 두세요."
+            !turn.signalSide.isNullOrBlank() ->
+                "${turnName}할 때 반대쪽 깜빡이 기록이 있어요. 다음엔 $side 깜빡이를 켜 보세요."
+            else ->
+                "${turnName}할 때 깜빡이 기록이 없었어요. 다음엔 회전 ${SIGNAL_TIP_M}미터 전에 켜 보세요."
         }
-        return "$fact $CANNOT_JUDGE"
+    }
+
+    /** 고칠 점 하나: 기록된 사실 + 다음에 해볼 것 + 리포트의 다음 목표 이름 */
+    private data class Issue(val fact: String, val tip: String, val count: Int)
+
+    // 고칠 점 후보 (횟수가 같으면 앞쪽 = 깜빡이 > 회전·교차로 앞 급감속 > 출발 급가속 > 그 밖의 급가속·급감속)
+    private fun issues(events: List<EventEntity>): List<Issue> {
+        val list = mutableListOf<Issue>()
+        val turns = events.filter { it.type == EventType.TURN.name }
+        val missed = turns.filter { it.signalUsed == false }
+        if (missed.isNotEmpty()) {
+            val dirs = missed.mapNotNull { it.direction }.toSet()
+            val name = when (dirs.singleOrNull()) { "RIGHT" -> "우회전"; "LEFT" -> "좌회전"; else -> "회전" }
+            val total = when (name) { "우회전" -> turns.count { it.direction == "RIGHT" }; "좌회전" -> turns.count { it.direction == "LEFT" }; else -> turns.size }
+            val opposite = missed.count { !it.signalSide.isNullOrBlank() }
+            list += if (opposite == missed.size) Issue(
+                "$name ${total}번 중 ${missed.size}번은 반대쪽 깜빡이 기록이 있었어요.",
+                "다음엔 회전하는 쪽 깜빡이를 ${SIGNAL_TIP_M}미터 전에 켜 보세요.", missed.size,
+            ) else Issue(
+                "$name ${total}번 중 ${missed.size - opposite}번은 깜빡이 기록이 없었어요.",
+                "다음엔 회전 ${SIGNAL_TIP_M}미터 전에 켜 보세요.", missed.size,
+            )
+        }
+        // 기록은 "회전·교차로 100m 안"까지만 알아서 어느 쪽인지 사실대로 둘 다 말한다 (2026-11-12 결정)
+        val nearBrakes = events.count { it.type == EventType.HARD_BRAKE.name && it.nearTurn == true }
+        if (nearBrakes > 0) list += Issue(
+            "회전·교차로 앞에서 급감속이 ${nearBrakes}번 있었어요.",
+            "다음엔 안내를 들으면 미리 발을 떼 보세요.", nearBrakes,
+        )
+        val startAccels = events.count { it.type == EventType.HARD_ACCEL.name && it.fromStop == true }
+        if (startAccels > 0) list += Issue(
+            "출발할 때 급가속이 ${startAccels}번 있었어요.",
+            "다음엔 처음 3초는 가속 페달을 살짝만 눌러 보세요.", startAccels,
+        )
+        val brakes = events.count { it.type == EventType.HARD_BRAKE.name && it.nearTurn != true }
+        val accels = events.count { it.type == EventType.HARD_ACCEL.name && it.fromStop != true }
+        val irregular = events.count { it.type == EventType.IRREGULAR_SPEED.name }
+        if (brakes + accels + irregular > 0) {
+            val parts = listOfNotNull(
+                if (brakes > 0) "급감속 ${brakes}번" else null,
+                if (accels > 0) "급가속 ${accels}번" else null,
+                if (irregular > 0) "불규칙한 속도 변화 ${irregular}번" else null,
+            )
+            list += Issue("${parts.joinToString(", ")}이 기록됐어요.", "다음엔 속도를 천천히 바꿔 보세요.", brakes + accels + irregular)
+        }
+        return list
+    }
+
+    // 고칠 점이 없을 때: 사실 + (질문한 주제 또는 로드맵 지금 단계)
+    private fun cleanAnswer(ctx: TripContext): String {
+        val topic = ctx.questions.firstNotNullOfOrNull { it.topic }
+        val next = when {
+            topic != null -> "$topic${ReportBuilder.josa(topic, "이", "가")} 궁금하셨으니, 다음엔 그 구간이 있는 길에서 연습해 봐요."
+            ctx.nextStage != null -> "다음엔 ${ctx.nextStage.label}${ReportBuilder.josa(ctx.nextStage.label, "을", "를")} 연습해 봐요."
+            else -> "다음엔 코칭을 조금 줄여 봐요."
+        }
+        return "오늘은 급가속·급감속 없이 부드럽게 달렸어요. $next"
     }
 
     private fun weaknessAnswer(ctx: TripContext?): String {
         noRecord(ctx)?.let { return it }
-        val report = ReportBuilder.build(ctx!!.events, ctx.questions, ctx.nextStage)
-        val card = report.cards.first()
-        val prefix = if (ctx.live) "지금까지 " else "이번 주행에서 "
-        return if (card.kind == CardKind.CLEAN) {
-            "${prefix}기록된 급가속이나 급감속, 깜빡이 누락은 없어요. $CANNOT_JUDGE"
-        } else {
-            "$prefix${card.fact}. $CANNOT_JUDGE"
-        }
+        val top = issues(ctx!!.events).maxByOrNull { it.count }   // 같으면 앞쪽
+            ?: return cleanAnswer(ctx)
+        return "${top.fact} ${top.tip}"
     }
 
+    // "더 연습할 부분은?": 가장 많은 고칠 점의 사실 + 리포트의 다음 목표
     private fun nextPracticeAnswer(ctx: TripContext?): String {
         noRecord(ctx)?.let { return it }
-        val report = ReportBuilder.build(ctx!!.events, ctx.questions, ctx.nextStage)
-        val parts = mutableListOf("다음엔 ${report.goal.title}${ReportBuilder.josa(report.goal.title, "을", "를")} 연습해 봐요.")
-        // 이번 주행에서 질문했던 주제와 "어려웠다"고 표시한 곳도 함께 알려준다 (신청서 4-⑤)
-        val asked = ctx.questions.mapNotNull { it.topic }.distinct().filter { it !in report.goal.title }
-        if (asked.isNotEmpty()) parts += "오늘 물어본 ${asked.joinToString(", ")}도 함께 연습하면 좋아요."
-        val difficult = ctx.events.count { it.difficult }
-        if (difficult > 0) parts += "어려웠다고 표시한 곳도 ${difficult}곳 있어요."
-        return parts.joinToString(" ")
+        val top = issues(ctx!!.events).maxByOrNull { it.count }
+            ?: return cleanAnswer(ctx)
+        val goal = ReportBuilder.build(ctx.events, ctx.questions, ctx.nextStage).goal.title
+        return "${top.fact} 다음엔 $goal${ReportBuilder.josa(goal, "을", "를")} 연습해 봐요."
     }
 }

@@ -36,9 +36,9 @@ node tools/e2e.js                         # 데모 경로로 주행 전체를 �
 
 ## 스크린샷
 
-| 홈 (연수 로드맵) | 주행 중 (내비와 반반 분할) | 주행 리포트 |
-|---|---|---|
-| ![홈](screenshots/home_roadmap.png) | ![주행 중](screenshots/drive_split.png) | ![리포트](screenshots/report.png) |
+| 홈 (연수 로드맵) | 주행 준비 | 주행 중 (내비와 반반 분할) | 주행 리포트 |
+|---|---|---|---|
+| ![홈](screenshots/home_roadmap.png) | ![주행 준비](screenshots/prep.png) | ![주행 중](screenshots/drive_split.png) | ![리포트](screenshots/report.png) |
 
 ## 라이선스
 

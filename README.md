@@ -3,6 +3,12 @@
 - **한 줄 소개**: 차량 주행 상태와 내비 정보를 연계해 초보운전자에게 상황별 음성 코칭과 맞춤 연습 과정을 주는 실시간 운전연수 앱
 - 팀: **MOBINOVA** / 플랫폼: Pleos Connect (Android Automotive)
 
+## 만든 이유
+
+- 면허를 따도 혼자 운전하기 두려운 초보운전자가 많음
+- 옆자리에서 "곧 좌회전, 깜빡이 미리 켜" 하고 말해 줄 사람이 없으면 실수가 두려움으로 남음
+- DriveMate가 연수 강사처럼 다음 상황을 미리 알려 주고, 주행 후 연습할 점을 정리해 줌
+
 | 홈 (연수 로드맵) | 주행 중 (내비와 분할) | 주행 리포트 |
 |---|---|---|
 | ![홈](screenshots/home_roadmap.png) | ![주행 중](screenshots/drive_split.png) | ![리포트](screenshots/report.png) |

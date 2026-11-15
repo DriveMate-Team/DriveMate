@@ -1,7 +1,7 @@
 # DriveMate
 
 - **한 줄 소개**: 차량 주행 상태와 내비 정보를 연계해 초보운전자에게 상황별 음성 코칭과 맞춤 연습 과정을 주는 실시간 운전연수 앱
-- 팀: **MOBINOVA** / 플랫폼: Pleos Connect (Android Automotive)
+- 팀: **FIRSTGEAR** / 플랫폼: Pleos Connect (Android Automotive)
 
 ## 만든 이유
 
@@ -15,7 +15,7 @@
 
 ## APK 위치
 
-- [`apk/MOBINOVA_DriveMate_release.apk`](apk/MOBINOVA_DriveMate_release.apk) (release, 서명됨)
+- [`apk/FIRSTGEAR_DriveMate_release.apk`](apk/FIRSTGEAR_DriveMate_release.apk) (release, 서명됨)
 
 ## 개발 환경
 
@@ -26,7 +26,7 @@
 ## 실행 방법
 
 1. Pleos Connect Emulator v2.1.0 실행
-2. APK 설치: `adb install -r apk/MOBINOVA_DriveMate_release.apk`
+2. APK 설치: `adb install -r apk/FIRSTGEAR_DriveMate_release.apk`
 3. 앱 목록에서 **DriveMate** 실행 → 권한(마이크·위치) 허용
 4. 홈 **주행 시작** → **출발하기**
 5. Virtual Console에서 기어 **D**, 속도 올리기 → 회전 300m 전 음성 코칭

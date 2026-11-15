@@ -2,7 +2,16 @@
 
 **차량의 실제 주행 상태와 내비게이션 정보를 연계하여 초보운전자에게 상황별 음성 코칭과 개인 맞춤형 연습 과정을 제공하는 실시간 운전연수 앱**
 
-Pleos Connect(Android Automotive) 차량용 앱입니다.
+Pleos Connect(Android Automotive) 차량용 앱입니다. 팀 **MOBINOVA**
+
+## 제출 정보
+
+| 항목 | 내용 |
+|---|---|
+| APK | [`apk/MOBINOVA_DriveMate_release.apk`](apk/MOBINOVA_DriveMate_release.apk) (release, 서명됨) |
+| 에뮬레이터 | Pleos Connect Emulator **v2.1.0** (AVD `Pleos_Connect_v2.1.0`, Android 14, x86_64) |
+| 화면 규격 | **2560 × 1440**, 160dpi (가로) |
+| 개발 도구 | Android Studio, minSdk 29 / targetSdk 36 |
 
 ## 시연 영상
 
@@ -114,6 +123,26 @@ automotive/src/main/java/com/example/drivemate/
 ```
 
 ## 실행 방법
+
+### APK로 바로 실행 (심사용)
+
+1. Pleos Connect Emulator v2.1.0을 켭니다.
+2. APK를 설치합니다.
+   ```bash
+   adb install -r apk/MOBINOVA_DriveMate_release.apk
+   ```
+3. 앱 목록에서 **DriveMate**를 엽니다. 이후 순서는 아래 소스 실행의 4~8번과 같습니다.
+
+에뮬레이터 내비는 위치가 움직이지 않기 때문에, 앱이 에뮬레이터에서 실행되면 release APK도 연습 경로를 자동으로 사용합니다. 실차에서는 실제 내비 경로를 씁니다.
+
+### 테스트 환경 및 필요한 설정
+
+- Pleos Connect Emulator v2.1.0 (2560 × 1440). 추가 계정이나 API 키는 필요 없습니다.
+- 권한: 마이크(음성 질문), 위치. 첫 실행 때 허용합니다.
+- 음성 질문을 쓰려면 에뮬레이터 Extended Controls > Microphone에서 **Host Microphone Access**를 켭니다. 에뮬레이터를 다시 켜면 꺼질 수 있습니다.
+- 기어·속도·방향지시등은 에뮬레이터의 **Virtual Console**에서 바꿉니다.
+
+### 소스에서 실행
 
 Android Studio와 Pleos Connect Emulator 기준입니다.
 

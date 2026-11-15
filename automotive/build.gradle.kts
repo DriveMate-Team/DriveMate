@@ -28,8 +28,20 @@ android {
         versionName = "2.0"
     }
 
+    // release 서명 정보: 비밀번호는 저장소에 올리지 않는 local.properties에서 읽는다 (없으면 서명 없이 빌드)
+    val releaseStore = localProps.getProperty("release.storeFile")
+    signingConfigs {
+        if (releaseStore != null) create("release") {
+            storeFile = file(releaseStore)
+            storePassword = localProps.getProperty("release.storePassword")
+            keyAlias = localProps.getProperty("release.keyAlias")
+            keyPassword = localProps.getProperty("release.keyPassword")
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseStore != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

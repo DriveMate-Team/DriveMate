@@ -3,6 +3,7 @@ package com.example.drivemate
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -44,8 +45,9 @@ class MainActivity : ComponentActivity() {
 
         val missing = RUNTIME_PERMISSIONS.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isEmpty()) startSources() else permissionLauncher.launch(missing.toTypedArray())
-        // 디버그 빌드: 앱이 시작할 때 연습 경로(가짜 내비 경로)를 자동으로 쓴다. 화면에는 버튼이 없다 (영상에서 실제 앱처럼 보이게)
-        if (BuildConfig.DEBUG && !navi.demo.value) navi.setDemo(true)
+        // 디버그 빌드이거나 에뮬레이터에서 실행 중이면: 연습 경로(가짜 내비 경로)를 자동으로 쓴다.
+        // 에뮬레이터 내비는 위치가 움직이지 않아서, 심사용 release APK도 에뮬레이터에선 연습 경로로 달린다. 실차에서는 실제 내비를 쓴다.
+        if ((BuildConfig.DEBUG || isEmulator()) && !navi.demo.value) navi.setDemo(true)
         handleDebugIntent(intent)
     }
 
@@ -53,6 +55,9 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         handleDebugIntent(intent)
     }
+
+    // 에뮬레이터인지 확인한다 (안드로이드 에뮬레이터의 하드웨어 이름은 "ranchu")
+    private fun isEmulator(): Boolean = Build.HARDWARE == "ranchu" || Build.PRODUCT.contains("avd")
 
     private fun startSources() {
         vehicle.start()
